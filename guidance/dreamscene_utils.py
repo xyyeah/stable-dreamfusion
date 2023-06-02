@@ -144,7 +144,7 @@ class DreamScene(nn.Module):
 
         n_pose = pose.size(1)
         if n_pose > 1:
-            instrinsic = instrinsic.repeat(n_pose, 1)
+            intrinsic = intrinsic.repeat(n_pose, 1)
             dist = dist.view(1).repeat(n_pose)
         pose = torch.cat(pose.unbind(dim=1), dim=0)
 
