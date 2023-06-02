@@ -45,7 +45,7 @@ class StableDiffusionUnclip(nn.Module):
         self.device = device
         self.sd_version = sd_version
 
-        print(f'[INFO] loading stable diffusion...')
+        print(f'[INFO] loading stable diffusion unclip...')
 
         pipe = StableUnCLIPImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-1-unclip-small",
                                                            torch_dtype=torch.float16)
@@ -79,7 +79,7 @@ class StableDiffusionUnclip(nn.Module):
         self.max_step = int(self.num_train_timesteps * t_range[1])
         self.alphas = self.scheduler.alphas_cumprod.to(self.device)  # for convenience
 
-        print(f'[INFO] loaded stable diffusion!')
+        print(f'[INFO] loaded stable diffusion unclip!')
 
     @torch.no_grad()
     def get_text_embeds(self, prompt):
