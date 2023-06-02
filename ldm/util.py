@@ -1,41 +1,11 @@
 import importlib
 
-import torchvision
 import torch
 from torch import optim
 import numpy as np
 
 from inspect import isfunction
 from PIL import Image, ImageDraw, ImageFont
-
-import os
-import numpy as np
-import matplotlib.pyplot as plt
-from PIL import Image
-import torch
-import time
-import cv2
-
-import PIL
-
-def pil_rectangle_crop(im):
-    width, height = im.size   # Get dimensions
-    
-    if width <= height:
-        left = 0
-        right = width
-        top = (height - width)/2
-        bottom = (height + width)/2
-    else:
-        
-        top = 0
-        bottom = height
-        left = (width - height) / 2
-        bottom = (width + height) / 2
-
-    # Crop the center of the image
-    im = im.crop((left, top, right, bottom))
-    return im
 
 
 def log_txt_as_img(wh, xc, size=10):
@@ -46,7 +16,7 @@ def log_txt_as_img(wh, xc, size=10):
     for bi in range(b):
         txt = Image.new("RGB", wh, color="white")
         draw = ImageDraw.Draw(txt)
-        font = ImageFont.truetype('data/DejaVuSans.ttf', size=size)
+        font = ImageFont.truetype('font/DejaVuSans.ttf', size=size)
         nc = int(40 * (wh[0] / 256))
         lines = "\n".join(xc[bi][start:start + nc] for start in range(0, len(xc[bi]), nc))
 
@@ -69,7 +39,7 @@ def ismap(x):
 
 
 def isimage(x):
-    if not isinstance(x,torch.Tensor):
+    if not isinstance(x, torch.Tensor):
         return False
     return (len(x.shape) == 4) and (x.shape[1] == 3 or x.shape[1] == 1)
 
@@ -95,7 +65,7 @@ def mean_flat(tensor):
 def count_params(model, verbose=False):
     total_params = sum(p.numel() for p in model.parameters())
     if verbose:
-        print(f"{model.__class__.__name__} has {total_params*1.e-6:.2f} M params.")
+        print(f"{model.__class__.__name__} has {total_params * 1.e-6:.2f} M params.")
     return total_params
 
 
@@ -117,10 +87,20 @@ def get_obj_from_str(string, reload=False):
     return getattr(importlib.import_module(module, package=None), cls)
 
 
+def autocast(f):
+    def do_autocast(*args, **kwargs):
+        with torch.cuda.amp.autocast(enabled=True,
+                                     dtype=torch.get_autocast_gpu_dtype(),
+                                     cache_enabled=torch.is_autocast_cache_enabled()):
+            return f(*args, **kwargs)
+
+    return do_autocast
+
+
 class AdamWwithEMAandWings(optim.Optimizer):
     # credit to https://gist.github.com/crowsonkb/65f7265353f403714fce3b2595e0b298
     def __init__(self, params, lr=1.e-3, betas=(0.9, 0.999), eps=1.e-8,  # TODO: check hyperparameters before using
-                 weight_decay=1.e-2, amsgrad=False, ema_decay=0.9999,   # ema decay to match previous code
+                 weight_decay=1.e-2, amsgrad=False, ema_decay=0.9999,  # ema decay to match previous code
                  ema_power=1., param_names=()):
         """AdamW that saves EMA versions of the parameters."""
         if not 0.0 <= lr:
@@ -207,18 +187,18 @@ class AdamWwithEMAandWings(optim.Optimizer):
                 state_steps.append(state['step'])
 
             optim._functional.adamw(params_with_grad,
-                    grads,
-                    exp_avgs,
-                    exp_avg_sqs,
-                    max_exp_avg_sqs,
-                    state_steps,
-                    amsgrad=amsgrad,
-                    beta1=beta1,
-                    beta2=beta2,
-                    lr=group['lr'],
-                    weight_decay=group['weight_decay'],
-                    eps=group['eps'],
-                    maximize=False)
+                                    grads,
+                                    exp_avgs,
+                                    exp_avg_sqs,
+                                    max_exp_avg_sqs,
+                                    state_steps,
+                                    amsgrad=amsgrad,
+                                    beta1=beta1,
+                                    beta2=beta2,
+                                    lr=group['lr'],
+                                    weight_decay=group['weight_decay'],
+                                    eps=group['eps'],
+                                    maximize=False)
 
             cur_ema_decay = min(ema_decay, 1 - state['step'] ** -ema_power)
             for param, ema_param in zip(params_with_grad, ema_params_with_grad):

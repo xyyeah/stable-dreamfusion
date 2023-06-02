@@ -25,7 +25,6 @@ import ldm.modules.image_degradation.utils_image as util
 # --------------------------------------------
 """
 
-
 def modcrop_np(img, sf):
     '''
     Args:
@@ -531,7 +530,7 @@ def degradation_bsrgan(img, sf=4, lq_patchsize=72, isp_model=None):
 
 
 # todo no isp_model?
-def degradation_bsrgan_variant(image, sf=4, isp_model=None):
+def degradation_bsrgan_variant(image, sf=4, isp_model=None, up=False):
     """
     This is the degradation model of BSRGAN from the paper
     "Designing a Practical Degradation Model for Deep Blind Image Super-Resolution"
@@ -617,6 +616,8 @@ def degradation_bsrgan_variant(image, sf=4, isp_model=None):
     # add final JPEG compression noise
     image = add_JPEG_noise(image)
     image = util.single2uint(image)
+    if up:
+        image = cv2.resize(image, (w1, h1), interpolation=cv2.INTER_CUBIC)  # todo: random, as above? want to condition on it then
     example = {"image": image}
     return example
 

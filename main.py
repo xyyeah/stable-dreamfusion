@@ -3,7 +3,7 @@ import argparse
 import pandas as pd
 import sys
 
-from nerf.provider import NeRFDataset
+from nerf.provider import NeRFDataset, NeRFPoseDataset
 from nerf.utils import *
 
 # torch.autograd.set_detect_anomaly(True)
@@ -150,9 +150,15 @@ if __name__ == '__main__':
     parser.add_argument('--light_phi', type=float, default=0, help="default GUI light direction in [0, 360), azimuth")
     parser.add_argument('--max_spp', type=int, default=1, help="GUI rendering max sample per pixel")
 
+    parser.add_argument('--zero123', action='store_true')
     parser.add_argument('--zero123_config', type=str, default='./pretrained/zero123/sd-objaverse-finetune-c_concat-256.yaml', help="config file for zero123")
     parser.add_argument('--zero123_ckpt', type=str, default='./pretrained/zero123/105000.ckpt', help="ckpt for zero123")
     parser.add_argument('--zero123_grad_scale', type=str, default='angle', help="whether to scale the gradients based on 'angle' or 'None'")
+
+    parser.add_argument("--dreamscene", action='store_true')
+    parser.add_argument("--dreamscene_config", type=str, default="./pretrained/dreamscene/rldm_vit_l3.yaml", help="config file for dreamscene")
+    parser.add_argument("--dreamscene_ckpt", type=str, default="/mnt/cache_sail/latest.ckpt", help="ckpt for dreamscene")
+    parser.add_argument("--posefile", type=str, default="", help="pose file for input image")
 
     parser.add_argument('--dataset_size_train', type=int, default=100, help="Length of train dataset i.e. # of iterations per epoch")
     parser.add_argument('--dataset_size_valid', type=int, default=8, help="# of frames to render in the turntable video in validation")
@@ -162,6 +168,7 @@ if __name__ == '__main__':
     parser.add_argument('--exp_end_iter', type=int, default=None, help="end iter # for experiment, to calculate progressive_view and progressive_level")
 
     opt = parser.parse_args()
+    # import pdb; pdb.set_trace()
 
     if opt.O:
         opt.fp16 = True
@@ -189,11 +196,21 @@ if __name__ == '__main__':
 
         if opt.text is None:
             # use zero123 guidance model when only providing image
-            opt.guidance = ['zero123']
-            if not opt.dont_override_stuff:
-                opt.fovy_range = [opt.default_fovy, opt.default_fovy] # fix fov as zero123 doesn't support changing fov
-                opt.guidance_scale = 5
-                opt.lambda_3d_normal_smooth = 10
+            if opt.zero123:
+                opt.guidance = ['zero123']
+                if not opt.dont_override_stuff:
+                    opt.fovy_range = [opt.default_fovy, opt.default_fovy] # fix fov as zero123 doesn't support changing fov
+                    opt.guidance_scale = 5
+                    opt.lambda_3d_normal_smooth = 10
+
+            elif opt.dreamscene:
+                opt.guidance = ['dreamscene']
+                # import pdb; pdb.set_trace()
+                if not opt.dont_override_stuff:
+                    opt.fovy_range = [opt.default_fovy, opt.default_fovy] # fix fov as zero123 doesn't support changing fov
+                    opt.guidance_scale = 3
+                    opt.lambda_3d_normal_smooth = 10
+
         else:
             # use stable-diffusion when providing both text and image
             opt.guidance = ['SD', 'clip']
@@ -299,7 +316,7 @@ if __name__ == '__main__':
     else:
         raise NotImplementedError(f'--backbone {opt.backbone} is not implemented!')
 
-    print(opt)
+    # print(opt)
 
     if opt.seed is not None:
         seed_everything(int(opt.seed))
@@ -321,8 +338,9 @@ if __name__ == '__main__':
             import trimesh
             mesh = trimesh.load(opt.init_with, force='mesh', skip_material=True, process=False)
             model.init_tet(mesh=mesh)
-
-    print(model)
+    
+    # import pdb; pdb.set_trace()
+    # print(model)
 
     if opt.six_views:
         guidance = None # no need to load guidance model at test
@@ -353,8 +371,11 @@ if __name__ == '__main__':
                 trainer.save_mesh()
 
     else:
-
-        train_loader = NeRFDataset(opt, device=device, type='train', H=opt.h, W=opt.w, size=opt.dataset_size_train * opt.batch_size).dataloader()
+        
+        if 'dreamscene' in opt.guidance:
+            train_loader = NeRFPoseDataset(opt, device=device, type='train', H=opt.h, W=opt.w, size=opt.dataset_size_train * opt.batch_size).dataloader()
+        else:
+            train_loader = NeRFDataset(opt, device=device, type='train', H=opt.h, W=opt.w, size=opt.dataset_size_train * opt.batch_size).dataloader()
 
         if opt.optim == 'adan':
             from optimizer import Adan
@@ -383,12 +404,22 @@ if __name__ == '__main__':
             from guidance.zero123_utils import Zero123
             guidance['zero123'] = Zero123(device=device, fp16=opt.fp16, config=opt.zero123_config, ckpt=opt.zero123_ckpt, vram_O=opt.vram_O, t_range=opt.t_range, opt=opt)
 
+        if 'dreamscene' in opt.guidance:
+            from guidance.dreamscene_utils import DreamScene
+            guidance['dreamscene'] = DreamScene(device=device, fp16=opt.fp16, config=opt.dreamscene_config, ckpt=opt.dreamscene_ckpt, vram_O=opt.vram_O, t_range=opt.t_range, opt=opt)
+
         if 'clip' in opt.guidance:
             from guidance.clip_utils import CLIP
             guidance['clip'] = CLIP(device)
+        
+        if 'VSD_simple' in opt.guidance:
+            pass #
+        print(opt)
+        _ =input()
 
         trainer = Trainer(' '.join(sys.argv), 'df', opt, model, guidance, device=device, workspace=opt.workspace, optimizer=optimizer, ema_decay=0.95, fp16=opt.fp16, lr_scheduler=scheduler, use_checkpoint=opt.ckpt, scheduler_update_every_step=True)
 
+        # import pdb; pdb.set_trace()
         trainer.default_view_data = train_loader._data.get_default_view_data()
 
         if opt.gui:
@@ -397,8 +428,12 @@ if __name__ == '__main__':
             gui.render()
 
         else:
-            valid_loader = NeRFDataset(opt, device=device, type='val', H=opt.H, W=opt.W, size=opt.dataset_size_valid).dataloader(batch_size=1)
-            test_loader = NeRFDataset(opt, device=device, type='test', H=opt.H, W=opt.W, size=opt.dataset_size_test).dataloader(batch_size=1)
+            if 'dreamscene' in opt.guidance:
+                valid_loader = NeRFPoseDataset(opt, device=device, type='val', H=opt.H, W=opt.W, size=opt.dataset_size_valid).dataloader(batch_size=1)
+                test_loader = NeRFPoseDataset(opt, device=device, type='test', H=opt.H, W=opt.W, size=opt.dataset_size_test).dataloader(batch_size=1)
+            else:
+                valid_loader = NeRFDataset(opt, device=device, type='val', H=opt.H, W=opt.W, size=opt.dataset_size_valid).dataloader(batch_size=1)
+                test_loader = NeRFDataset(opt, device=device, type='test', H=opt.H, W=opt.W, size=opt.dataset_size_test).dataloader(batch_size=1)
 
             max_epoch = np.ceil(opt.iters / len(train_loader)).astype(np.int32)
             trainer.train(train_loader, valid_loader, test_loader, max_epoch)

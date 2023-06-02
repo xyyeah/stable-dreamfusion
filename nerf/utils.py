@@ -154,7 +154,7 @@ class Trainer(object):
                  use_tensorboardX=True, # whether to use tensorboard for logging
                  scheduler_update_every_step=False, # whether to call scheduler.step() after every train step
                  ):
-
+        # import pdb; pdb.set_trace()
         self.argv = argv
         self.name = name
         self.opt = opt
@@ -193,6 +193,8 @@ class Trainer(object):
                     p.requires_grad = False
                 self.embeddings[key] = {}
             self.prepare_embeddings()
+
+            # import pdb; pdb.set_trace()
 
         if isinstance(criterion, nn.Module):
             criterion.to(self.device)
@@ -283,6 +285,7 @@ class Trainer(object):
     # calculate the text embs.
     @torch.no_grad()
     def prepare_embeddings(self):
+        # import pdb; pdb.set_trace()
 
         # text embeddings (stable-diffusion)
         if self.opt.text is not None:
@@ -303,6 +306,11 @@ class Trainer(object):
 
             if 'clip' in self.guidance:
                 self.embeddings['clip']['text'] = self.guidance['clip'].get_text_embeds(self.opt.text)
+            
+            if 'VSD_simple' in self.guidance:
+                self.embeddings['VSD_simple']['SD']['default'] = self.guidance['VSD_simple']['SD'].get_text_embeds([self.opt.text])
+                self.embeddings['VSD_simple']['SD']['uncond'] = self.guidance['VSD_simple']['SD'].get_text_embeds([self.opt.negative])
+                self.embeddings['VSD_simple']['clip']['text'] = self.guidance['VSD_simple']['clip'].get_text_embeds([self.opt.text])
 
         if self.opt.images is not None:
 
@@ -347,6 +355,35 @@ class Trainer(object):
                     'ref_azimuths' : self.opt.ref_azimuths,
                     'ref_radii' : self.opt.ref_radii,
                 }
+            
+            if 'dreamscene' in self.guidance:
+                rgba_256 = np.stack([cv2.resize(rgba, (256, 256), interpolation=cv2.INTER_AREA).astype(np.float32) / 255 for rgba in rgbas])
+                rgbs_256 = rgba_256[..., :3] * rgba_256[..., 3:] + (1 - rgba_256[..., 3:])
+                rgb_256 = torch.from_numpy(rgbs_256).contiguous().to(self.device)
+                guidance_embeds = self.guidance["dreamscene"].get_img_embeds(rgb_256)
+                self.embeddings["dreamscene"]["default"] = {
+                    'c_crossattn' : guidance_embeds[0],
+                    'c_concat' : guidance_embeds[1],
+                    'c_adm': guidance_embeds[2],
+                    # "cond_rt": None,
+                    # "target_rt": None
+                }
+
+            if 'VSD_simple' in self.guidance:
+                self.embeddings['VSD_simple']['clip']['image'] = self.guidance['VSD_simple']['clip'].get_img_embeds(self.rgb)
+
+                rgba_256 = np.stack([cv2.resize(rgba, (256, 256), interpolation=cv2.INTER_AREA).astype(np.float32) / 255 for rgba in rgbas])
+                rgbs_256 = rgba_256[..., :3] * rgba_256[..., 3:] + (1 - rgba_256[..., 3:])
+                rgb_256 = torch.from_numpy(rgbs_256).contiguous().to(self.device)
+                guidance_embeds = self.guidance['VSD_simple']["dreamscene"].get_img_embeds(rgb_256)
+
+                self.embeddings['VSD_simple']['dreamscene']['default'] = {
+                    'c_crossattn' : guidance_embeds[0],
+                    'c_concat' : guidance_embeds[1],
+                    'c_adm': guidance_embeds[2],
+                }
+
+
 
             if 'clip' in self.guidance:
                 self.embeddings['clip']['image'] = self.guidance['clip'].get_img_embeds(self.rgb)
@@ -374,6 +411,7 @@ class Trainer(object):
                 save_guidance_path: an image that combines the NeRF render, the added latent noise,
                     the denoised result and optionally the fully-denoised image.
         """
+        # import pdb; pdb.set_trace()
 
         # perform RGBD loss instead of SDS if is image-conditioned
         do_rgbd_loss = self.opt.images is not None and \
@@ -588,6 +626,13 @@ class Trainer(object):
                 loss = loss + self.guidance['zero123'].train_step(self.embeddings['zero123']['default'], pred_rgb, polar, azimuth, radius, guidance_scale=self.opt.guidance_scale,
                                                                   as_latent=as_latent, grad_scale=self.opt.lambda_guidance, save_guidance_path=save_guidance_path)
 
+            if "dreamscene" in self.guidance:
+                pose = data["relative_pose"]
+                intrinsic = data["intrinsic"]
+                dist = data["source"] 
+                loss = loss + self.guidance["dreamscene"].train_step(self.embeddings["dreamscene"]["default"], pred_rgb, pose, intrinsic, dist, guidance_scale=self.opt.guidance_scale,
+                                                                     as_latent=as_latent, grad_scale=self.opt.lambda_guidance, save_guidance_path=save_guidance_path)
+
             if 'clip' in self.guidance:
 
                 # empirical, far view should apply smaller CLIP loss
@@ -714,6 +759,8 @@ class Trainer(object):
     ### ------------------------------
 
     def train(self, train_loader, valid_loader, test_loader, max_epochs):
+
+        # import pdb; pdb.set_trace()
 
         if self.use_tensorboardX and self.local_rank == 0:
             self.writer = tensorboardX.SummaryWriter(os.path.join(self.workspace, "run", self.name))
@@ -920,8 +967,8 @@ class Trainer(object):
         return outputs
 
     def train_one_epoch(self, loader, max_epochs):
-        self.log(f"==> [{time.strftime('%Y-%m-%d_%H-%M-%S')}] Start Training {self.workspace} Epoch {self.epoch}/{max_epochs}, lr={self.optimizer.param_groups[0]['lr']:.6f} ...")
-
+        self.log(f"==> [{time.strftime('%Y-%m-%d_%H-%M-%S')}] Start Training {self.workspace} Epoch {self.epoch}/{max_epochs}, lr={self.optimizer.param_groups[0]['lr']:.6f} optim: {self.opt.optim} ...")
+        # import pdb; pdb.set_trace()
         total_loss = 0
         if self.local_rank == 0 and self.report_metric_at_train:
             for metric in self.metrics:

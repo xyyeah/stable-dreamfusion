@@ -118,13 +118,14 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('path', type=str, help="path to image (png, jpeg, etc.)")
+    parser.add_argument('out_dir', type=str, help="path to save output images")
     parser.add_argument('--size', default=256, type=int, help="output resolution")
     parser.add_argument('--border_ratio', default=0.2, type=float, help="output border ratio")
     parser.add_argument('--recenter', type=bool, default=True, help="recenter, potentially not helpful for multiview zero123")
     parser.add_argument('--dont_recenter', dest='recenter', action='store_false')
     opt = parser.parse_args()
 
-    out_dir = os.path.dirname(opt.path)
+    out_dir = opt.out_dir
     out_rgba = os.path.join(out_dir, os.path.basename(opt.path).split('.')[0] + '_rgba.png')
     out_depth = os.path.join(out_dir, os.path.basename(opt.path).split('.')[0] + '_depth.png')
     out_normal = os.path.join(out_dir, os.path.basename(opt.path).split('.')[0] + '_normal.png')
@@ -132,11 +133,16 @@ if __name__ == '__main__':
 
     # load image
     print(f'[INFO] loading image...')
+    print(os.path.exists(opt.path))
     image = cv2.imread(opt.path, cv2.IMREAD_UNCHANGED)
     if image.shape[-1] == 4:
         image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
     else:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    sh, sw, sc = image.shape 
+    fscale = 256.0 / min(sh, sw)
+    image = cv2.resize(image, (int(fscale * sw), int(fscale * sh)), interpolation=cv2.INTER_AREA)
 
     # carve background
     print(f'[INFO] background removal...')
@@ -160,9 +166,10 @@ if __name__ == '__main__':
     normal[~mask] = 0
     del dpt_normal_model
 
-    # recenter
-    if opt.recenter:
+    # # recenter
+    if True :
         print(f'[INFO] recenter...')
+        
         final_rgba = np.zeros((opt.size, opt.size, 4), dtype=np.uint8)
         final_depth = np.zeros((opt.size, opt.size), dtype=np.uint8)
         final_normal = np.zeros((opt.size, opt.size, 3), dtype=np.uint8)
@@ -173,6 +180,7 @@ if __name__ == '__main__':
         h = x_max - x_min
         w = y_max - y_min
         desired_size = int(opt.size * (1 - opt.border_ratio))
+        # desired_size = 200
         scale = desired_size / max(h, w)
         h2 = int(h * scale)
         w2 = int(w * scale)
@@ -183,7 +191,7 @@ if __name__ == '__main__':
         final_rgba[x2_min:x2_max, y2_min:y2_max] = cv2.resize(carved_image[x_min:x_max, y_min:y_max], (w2, h2), interpolation=cv2.INTER_AREA)
         final_depth[x2_min:x2_max, y2_min:y2_max] = cv2.resize(depth[x_min:x_max, y_min:y_max], (w2, h2), interpolation=cv2.INTER_AREA)
         final_normal[x2_min:x2_max, y2_min:y2_max] = cv2.resize(normal[x_min:x_max, y_min:y_max], (w2, h2), interpolation=cv2.INTER_AREA)
-
+        # import pdb; pdb.set_trace()
     else:
         final_rgba = carved_image
         final_depth = depth

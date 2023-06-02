@@ -59,7 +59,7 @@ class StableDiffusion(nn.Module):
         self.precision_t = torch.float16 if fp16 else torch.float32
 
         # Create model
-        pipe = StableDiffusionPipeline.from_pretrained(model_key, torch_dtype=self.precision_t)
+        pipe = StableDiffusionPipeline.from_pretrained(model_key, torch_dtype=self.precision_t, cache_dir="./cache_dir")
 
         if vram_O:
             pipe.enable_sequential_cpu_offload()
@@ -75,7 +75,7 @@ class StableDiffusion(nn.Module):
         self.text_encoder = pipe.text_encoder
         self.unet = pipe.unet
 
-        self.scheduler = DDIMScheduler.from_pretrained(model_key, subfolder="scheduler", torch_dtype=self.precision_t)
+        self.scheduler = DDIMScheduler.from_pretrained(model_key, subfolder="scheduler", torch_dtype=self.precision_t, cache_dir="./cache_dir")
 
         del pipe
 

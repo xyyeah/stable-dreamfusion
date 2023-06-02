@@ -765,7 +765,7 @@ def calculate_weights_indices(in_length, out_length, scale, kernel, kernel_width
 # --------------------------------------------
 def imresize(img, scale, antialiasing=True):
     # Now the scale should be the same for H and W
-    # input: img: pytorch tensor, CHW or HW [0,1]
+    # input: img: pytorch_lightning tensor, CHW or HW [0,1]
     # output: CHW or HW [0,1] w/o round
     need_squeeze = True if img.dim() == 2 else False
     if need_squeeze:
