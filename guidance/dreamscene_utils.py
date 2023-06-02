@@ -94,7 +94,8 @@ def load_model_from_config(config_file, ckpt, device, vram_O=False, verbose=Fals
 class DreamScene(nn.Module):
     def __init__(self, device, fp16,
                  config="./pretrained/dreamscene/rldm_vit_l3.yaml",
-                 ckpt="/mnt/cache_sail/latest.ckpt", vram_O=False, t_range=[0.02, 0.98], opt=None):
+                 ckpt="/workspace/ControlNet/scene/final_image_cond8/model-epoch=66-global_step=83499.0.ckpt",
+                 vram_O=False, t_range=[0.02, 0.98], opt=None):
         super().__init__()
 
         self.device = device
