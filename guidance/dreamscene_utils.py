@@ -178,7 +178,6 @@ class DreamScene(nn.Module):
             num_imgs = len(embeddings["c_crossattn"])
             for idx in range(num_imgs):
 
-
                 c_crossattn, c_concat, c_adm = embeddings["c_crossattn"][idx], embeddings["c_concat"][idx], \
                                                embeddings["c_adm"][idx]
                 cond = {"c_crossattn": [c_crossattn], "c_concat": [c_concat], "c_adm": c_adm, "pose": pose,
@@ -205,9 +204,11 @@ class DreamScene(nn.Module):
             img_embeds = embeddings["c_adm"][0]
             text_embeds = embeddings['prompt_embeds']
             neg_text_embeds = embeddings['neg_prompt_embeds']
-            model_output_sd = self.sd_model.unet(x_in, t_in,
-                                      class_labels=torch.cat([torch.zeros_like(img_embeds), img_embeds], dim=0),
-                                      encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0))[0]
+            model_output_sd = self.sd_model.unet(
+                x_in, t_in,
+                class_labels=torch.cat([torch.zeros_like(img_embeds), img_embeds], dim=0),
+                encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0)
+            )[0]
             model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
             model_output_sd = model_uncond + guidance_scale * (model_t_sd - model_uncond_sd)
             if self.model.parameterization == "v":
@@ -224,7 +225,8 @@ class DreamScene(nn.Module):
 
         w = (1 - self.alphas[t])
         # grad = (grad_scale * w)[:, None, None, None] * (noise_pred - noise)
-        grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_pred)
+        # grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_pred)
+        grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise)
         grad = torch.nan_to_num(grad)
 
         if save_guidance_path:
