@@ -50,7 +50,7 @@ class StableDiffusionUnclip(nn.Module):
         pipe = StableUnCLIPImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-1-unclip-small",
                                                            torch_dtype=torch.float16)
         pipe.to("cuda")
-
+        self.precision_t = torch.float16 if fp16 else torch.float32
         if vram_O:
             pipe.enable_sequential_cpu_offload()
             pipe.enable_vae_slicing()
