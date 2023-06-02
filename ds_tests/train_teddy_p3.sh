@@ -8,7 +8,7 @@
          --workspace /workspace/teddy_vsd --iters 10000 --dreamscene --posefile "" \
          --save_guidance --save_guidance_interval 50 \
          --ckpt scratch --batch_size 1 --h 96 --w 96 --fovy_range 20 20 --default_fovy 20 --guidance_scale 7.5 \
-         --lambda_3d_normal_smooth 10 --dont_override_stuff --test_interval 2 \
+         --dont_override_stuff --test_interval 2 --lambda_depth 0 \
          --text "a brown teddy bear sitting on a ground" --negative "low quality"
 
 # # # Phase 1

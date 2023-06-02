@@ -139,7 +139,7 @@ class DreamScene(nn.Module):
         for xx in x:
             if len(xx.shape) == 3:
                 xx = xx.unsqueeze(0)
-            c, v, cadm = self.model.get_img_embeds(xx)
+            c, v, cadm = self.model.get_img_embeds(2.0 * xx - 1.0)
             cs.append(c)
             vs.append(v)
             cadms.append(cadm)
