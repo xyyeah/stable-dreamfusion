@@ -129,6 +129,7 @@ class DreamScene(nn.Module):
         self.alphas = self.scheduler.alphas_cumprod.to(self.device)  # for convenience
 
         self.sd_model = StableDiffusionUnclip(device, fp16, False)
+        del self.model.vae.decoder
 
     @torch.no_grad()
     def get_img_embeds(self, x):
@@ -163,6 +164,9 @@ class DreamScene(nn.Module):
         else:
             pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=False) * 2 - 1
             latents = self.encode_imgs(pred_rgb_256)
+
+            pred_rgb_768 = F.interpolate(pred_rgb, (768, 768), mode="bilinear", align_corners=False) * 2 - 1
+            latents_768 = self.encode_imgs(pred_rgb_768)
 
         t = torch.randint(self.min_step, self.max_step + 1, (latents.shape[0],), dtype=torch.long, device=self.device)
 
@@ -200,6 +204,14 @@ class DreamScene(nn.Module):
 
             render_rgb = render_rgb.chunk(2)[1]
             model_output = model_uncond + guidance_scale * (model_t - model_uncond)
+            if self.model.parameterization == "v":
+                e_t = self.model.predict_eps_from_z_and_v(latents_noisy, t, model_output)
+            else:
+                e_t = model_output
+
+            noise_768 = torch.randn_like(latents_768)
+            latents_noisy_768 = self.scheduler.add_noise(latents_768, noise_768, t)
+            x_in = torch.cat([latents_noisy_768] * 2)
 
             img_embeds = embeddings["c_adm"][0]
             text_embeds = embeddings['prompt_embeds']
@@ -212,10 +224,8 @@ class DreamScene(nn.Module):
             model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
             model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
             if self.model.parameterization == "v":
-                e_t = self.model.predict_eps_from_z_and_v(latents_noisy, t, model_output)
                 e_t_sd = self.model.predict_eps_from_z_and_v(latents_noisy, t, model_output_sd)
             else:
-                e_t = model_output
                 e_t_sd = model_output_sd
 
             noise_preds.append(e_t)
@@ -225,9 +235,12 @@ class DreamScene(nn.Module):
 
         w = (1 - self.alphas[t])
         # grad = (grad_scale * w)[:, None, None, None] * (noise_pred - noise)
-        grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_pred)
+        # grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_pred)
+        grad = (grad_scale * w)[:, None, None, None] * (-noise_pred)
+        grad2 = (grad_scale * w)[:, None, None, None] * noise_pred_sd
         # grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise)
         grad = torch.nan_to_num(grad)
+        grad2 = torch.nan_to_num(grad2)
 
         if save_guidance_path:
             with torch.no_grad():
@@ -247,7 +260,7 @@ class DreamScene(nn.Module):
             save_image(viz_images, save_guidance_path)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(latents, grad)
+        loss = SpecifyGradient.apply(latents, grad) + SpecifyGradient.apply(latents_768, grad2)
 
         return loss
 
