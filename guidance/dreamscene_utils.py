@@ -234,13 +234,13 @@ class DreamScene(nn.Module):
         noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
         w = (1 - self.alphas[t])
-        # grad = (grad_scale * w)[:, None, None, None] * (noise_pred - noise)
+        grad = (grad_scale * w)[:, None, None, None] * (noise_pred - noise)
         # grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_pred)
-        grad = (grad_scale * w)[:, None, None, None] * (-noise_pred)
-        grad2 = (grad_scale * w)[:, None, None, None] * noise_pred_sd
+        # grad = (grad_scale * w)[:, None, None, None] * (-noise_pred)
+        # grad2 = (grad_scale * w)[:, None, None, None] * noise_pred_sd
         # grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise)
         grad = torch.nan_to_num(grad)
-        grad2 = torch.nan_to_num(grad2)
+        # grad2 = torch.nan_to_num(grad2)
 
         if save_guidance_path:
             with torch.no_grad():
@@ -265,7 +265,7 @@ class DreamScene(nn.Module):
             save_image(viz_images, save_guidance_path)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(latents, grad) + SpecifyGradient.apply(latents_768, grad2)
+        loss = SpecifyGradient.apply(latents, grad) # + SpecifyGradient.apply(latents_768, grad2)
 
         return loss
 
