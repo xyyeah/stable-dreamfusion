@@ -384,11 +384,19 @@ class Trainer(object):
                 rgbs_256 = rgba_256[..., :3] * rgba_256[..., 3:] + (1 - rgba_256[..., 3:])
                 rgb_256 = torch.from_numpy(rgbs_256).contiguous().to(self.device)
                 guidance_embeds = self.guidance["dreamscene"].get_img_embeds(rgb_256)
-                self.embeddings["dreamscene"]["default"].update({
-                    'c_crossattn': guidance_embeds[0],
-                    'c_concat': guidance_embeds[1],
-                    'c_adm': guidance_embeds[2],
-                })
+                if "default" in self.embeddings["dreamscene"]:
+                    print('fuck', self.opt.text, self.opt.negative)
+                    self.embeddings["dreamscene"]["default"].update({
+                        'c_crossattn': guidance_embeds[0],
+                        'c_concat': guidance_embeds[1],
+                        'c_adm': guidance_embeds[2],
+                    })
+                else:
+                    self.embeddings["dreamscene"]["default"] = {
+                        'c_crossattn': guidance_embeds[0],
+                        'c_concat': guidance_embeds[1],
+                        'c_adm': guidance_embeds[2],
+                    }
 
             if 'VSD_simple' in self.guidance:
                 self.embeddings['VSD_simple']['clip']['image'] = self.guidance['VSD_simple']['clip'].get_img_embeds(

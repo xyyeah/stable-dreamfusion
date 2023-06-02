@@ -316,7 +316,7 @@ class DreamScene(nn.Module):
             render_rgb = render_rgb.chunk(2)[1]
             model_output = model_uncond + scale * (model_t - model_uncond)
             if self.model.parameterization == "v":
-                e_t = self.model.predict_eps_from_z_and_v(latents, t.view(1).to(self.device), model_output)
+                e_t = self.model.scheduler.predict_eps_from_z_and_v(latents, t.view(1).to(self.device), model_output)
             else:
                 e_t = model_output
             latents = self.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
