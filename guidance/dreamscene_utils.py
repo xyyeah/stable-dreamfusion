@@ -160,12 +160,12 @@ class DreamScene(nn.Module):
         pose = torch.cat(pose.unbind(dim=1), dim=0)
 
         if as_latent:
-            latents = F.interpolate(pred_rgb, (32, 32), mode="bilinear", align_corners=False) * 2 - 1
+            latents = F.interpolate(pred_rgb, (32, 32), mode="bilinear", align_corners=True) * 2 - 1
         else:
-            pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=False) * 2 - 1
+            pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=True) * 2 - 1
             latents = self.encode_imgs(pred_rgb_256)
 
-            pred_rgb_768 = F.interpolate(pred_rgb, (768, 768), mode="bilinear", align_corners=False) * 2 - 1
+            pred_rgb_768 = F.interpolate(pred_rgb, (768, 768), mode="bilinear", align_corners=True) * 2 - 1
             latents_768 = self.encode_imgs(pred_rgb_768)
 
         t = torch.randint(self.min_step, self.max_step + 1, (latents.shape[0],), dtype=torch.long, device=self.device)
@@ -250,13 +250,18 @@ class DreamScene(nn.Module):
             # visualize predicted denoised image
             result_hopefully_less_noisy_image = self.decode_latents(
                 self.model.predict_start_from_noise(latents_noisy, t, noise_pred))
+            result_hopefully_less_noisy_image2 = self.decode_latents(
+                self.model.predict_start_from_noise(latents_noisy_768, t, noise_pred_sd))
+            result_hopefully_less_noisy_image2 = \
+                F.interpolate(result_hopefully_less_noisy_image2, (256, 256), mode="bilinear", align_corners=True)
             # visualize noisier image
             result_noisier_image = self.decode_latents(latents_noisy)
 
             rendered_imgs = self.decode_latents(render_rgb)
             # all 3 input images are [1, 3, H, W], e.g. [1, 3, 512, 512]
             viz_images = torch.cat(
-                [pred_rgb_256, result_noisier_image, result_hopefully_less_noisy_image, rendered_imgs], dim=-1)
+                [pred_rgb_256, result_noisier_image, result_hopefully_less_noisy_image,
+                 result_hopefully_less_noisy_image2, rendered_imgs], dim=-1)
             save_image(viz_images, save_guidance_path)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
