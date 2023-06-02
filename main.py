@@ -157,7 +157,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--dreamscene", action='store_true')
     parser.add_argument("--dreamscene_config", type=str, default="./pretrained/dreamscene/rldm_vit_l3.yaml", help="config file for dreamscene")
-    parser.add_argument("--dreamscene_ckpt", type=str, default="/mnt/cache_sail/latest.ckpt", help="ckpt for dreamscene")
+    parser.add_argument("--dreamscene_ckpt", type=str, default="/workspace/ControlNet/scene/final_image_cond8/model-epoch=66-global_step=83499.0.ckpt", help="ckpt for dreamscene")
     parser.add_argument("--posefile", type=str, default="", help="pose file for input image")
 
     parser.add_argument('--dataset_size_train', type=int, default=100, help="Length of train dataset i.e. # of iterations per epoch")
