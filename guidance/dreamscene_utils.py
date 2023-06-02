@@ -224,7 +224,7 @@ class DreamScene(nn.Module):
             model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
             model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
             if self.model.parameterization == "v":
-                e_t_sd = self.model.predict_eps_from_z_and_v(latents_noisy, t, model_output_sd)
+                e_t_sd = self.model.predict_eps_from_z_and_v(latents_noisy_768, t, model_output_sd)
             else:
                 e_t_sd = model_output_sd
 
