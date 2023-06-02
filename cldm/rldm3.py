@@ -126,13 +126,14 @@ class ControlLDM(LatentDiffusion):
         else:
             self.noise_augmentor = None
 
-    
+
     @torch.no_grad()
     def get_img_embeds(self, imgs, bs=None, noise_level=None, *args, **kwargs):
         # imgs: image tensor [B, h, w, c] 
         # import pdb; pdb.set_trace()
 
-        batch = {self.first_stage_key: torch.zeros_like(imgs), self.control_key: imgs, self.cond_stage_key: ["a photo of object"]}
+        batch = {self.first_stage_key: torch.zeros_like(imgs), self.control_key: imgs,
+                 self.cond_stage_key: ["a photo of object"]}
         x, c = super().get_input(batch, self.first_stage_key)
         control = batch[self.control_key]
         if bs is not None:

@@ -132,6 +132,9 @@ class DreamScene(nn.Module):
 
         del self.pipe
 
+    def get_text_embeds(self, x):
+        return self.model.get_learned_conditioning([x])
+
     @torch.no_grad()
     def get_img_embeds(self, x):
         # x: image tensor [B, 3, 256, 256] in [0, 1]

@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.utils import save_image
-
+from diffusers import StableUnCLIPImg2ImgPipeline
 from torch.cuda.amp import custom_bwd, custom_fwd
 
 
@@ -38,7 +38,7 @@ def seed_everything(seed):
     # torch.backends.cudnn.benchmark = True
 
 
-class StableDiffusion(nn.Module):
+class StableDiffusionUnclip(nn.Module):
     def __init__(self, device, fp16, vram_O, sd_version='2.1', hf_key=None, t_range=[0.02, 0.98]):
         super().__init__()
 
@@ -47,22 +47,9 @@ class StableDiffusion(nn.Module):
 
         print(f'[INFO] loading stable diffusion...')
 
-        if hf_key is not None:
-            print(f'[INFO] using hugging face custom model key: {hf_key}')
-            model_key = hf_key
-        elif self.sd_version == '2.1':
-            model_key = "stabilityai/stable-diffusion-2-1-base"
-        elif self.sd_version == '2.0':
-            model_key = "stabilityai/stable-diffusion-2-base"
-        elif self.sd_version == '1.5':
-            model_key = "runwayml/stable-diffusion-v1-5"
-        else:
-            raise ValueError(f'Stable-diffusion version {self.sd_version} not supported.')
-
-        self.precision_t = torch.float16 if fp16 else torch.float32
-
-        # Create model
-        pipe = StableDiffusionPipeline.from_pretrained(model_key, torch_dtype=self.precision_t, cache_dir="./cache_dir")
+        pipe = StableUnCLIPImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-1-unclip-small",
+                                                           torch_dtype=torch.float16)
+        pipe.to("cuda")
 
         if vram_O:
             pipe.enable_sequential_cpu_offload()
@@ -78,10 +65,14 @@ class StableDiffusion(nn.Module):
         self.text_encoder = pipe.text_encoder
         self.unet = pipe.unet
 
-        self.scheduler = DDIMScheduler.from_pretrained(model_key, subfolder="scheduler", torch_dtype=self.precision_t,
+        self.scheduler = DDIMScheduler.from_pretrained("stabilityai/stable-diffusion-2-1-unclip-small",
+                                                       subfolder="scheduler", torch_dtype=self.precision_t,
                                                        cache_dir="./cache_dir")
 
         del pipe
+        del self.tokenizer
+        del self.text_encoder
+        del self.vae
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.min_step = int(self.num_train_timesteps * t_range[0])
@@ -100,7 +91,7 @@ class StableDiffusion(nn.Module):
 
         return embeddings
 
-    def train_step(self, text_embeddings, pred_rgb, guidance_scale=100, as_latent=False, grad_scale=1,
+    def train_step(self, text_embeddings, image_embeddings, pred_rgb, guidance_scale=100, as_latent=False, grad_scale=1,
                    save_guidance_path: Path = None):
 
         if as_latent:
@@ -122,7 +113,8 @@ class StableDiffusion(nn.Module):
             # pred noise
             latent_model_input = torch.cat([latents_noisy] * 2)
             tt = torch.cat([t] * 2)
-            noise_pred = self.unet(latent_model_input, tt, encoder_hidden_states=text_embeddings).sample
+            noise_pred = self.unet(latent_model_input, tt, class_labels=image_embeddings,
+                                   encoder_hidden_states=text_embeddings)[0]
 
             # perform guidance (high scale from paper!)
             noise_pred_uncond, noise_pred_pos = noise_pred.chunk(2)

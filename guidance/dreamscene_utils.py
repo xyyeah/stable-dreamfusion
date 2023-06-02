@@ -13,15 +13,19 @@ import PIL
 
 from diffusers import DDIMScheduler
 
-import os 
+import os
 import sys
 from os import path
+
+from guidance.sd_unclip_utils import StableDiffusionUnclip
+
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 import cv2
 from PIL import Image
 import json
 
 from ldm.util import instantiate_from_config
+
 
 class SpecifyGradient(torch.autograd.Function):
     @staticmethod
@@ -42,6 +46,7 @@ class SpecifyGradient(torch.autograd.Function):
 def get_state_dict(d):
     return d.get('state_dict', d)
 
+
 def load_state_dict(ckpt_path, location='cpu'):
     _, extension = os.path.splitext(ckpt_path)
     if extension.lower() == ".safetensors":
@@ -53,6 +58,7 @@ def load_state_dict(ckpt_path, location='cpu'):
     print(f'[INFO] Loaded state_dict from [{ckpt_path}]')
     return state_dict
 
+
 def load_checkpoint(model, resume):
     resume = resume
     print('[INFO] Loading ckpt from {}...'.format(resume))
@@ -62,33 +68,32 @@ def load_checkpoint(model, resume):
 
 # load model
 def load_model_from_config(config_file, ckpt, device, vram_O=False, verbose=False):
-
     # import pdb; pdb.set_trace()
 
     # create model
     config = OmegaConf.load(config_file)
     model = instantiate_from_config(config.model).cpu()
     print(f'[INFO] Loaded model config from [{config_file}]')
-    load_checkpoint(model, ckpt)    # for debug
+    load_checkpoint(model, ckpt)  # for debug
     model = model.to(device)
     model.sd_locked = True
     model.only_mid_control = False
-    model.training = False 
-    
+    model.training = False
+
     if model.use_ema:
         if verbose:
             print("[INFO] loading EMA...")
         model.model_ema.copy_to(model.model)
         del model.model_ema
-    
-    if vram_O: 
+
+    if vram_O:
         # we don't need decoder
         del model.first_stage_model.decoder
-    
+
     torch.cuda.empty_cache()
     model.eval().to(device)
 
-    return model, config 
+    return model, config
 
 
 class DreamScene(nn.Module):
@@ -102,16 +107,16 @@ class DreamScene(nn.Module):
         self.fp16 = fp16
         self.vram_O = vram_O
         self.t_range = t_range
-        self.opt = opt 
+        self.opt = opt
 
         self.model, self.config = load_model_from_config(config, ckpt, device, self.vram_O)
 
         # timesteps: use diffuser for convenience... hope it's alright.
-        self.num_train_timesteps = self.config.model.params.timesteps 
+        self.num_train_timesteps = self.config.model.params.timesteps
 
         self.scheduler = DDIMScheduler(
             self.num_train_timesteps,
-            self.config.model.params.linear_start, 
+            self.config.model.params.linear_start,
             self.config.model.params.linear_end,
             beta_schedule='scaled_linear',
             clip_sample=False,
@@ -121,13 +126,15 @@ class DreamScene(nn.Module):
 
         self.min_step = int(self.num_train_timesteps * t_range[0])
         self.max_step = int(self.num_train_timesteps * t_range[1])
-        self.alphas = self.scheduler.alphas_cumprod.to(self.device) # for convenience
+        self.alphas = self.scheduler.alphas_cumprod.to(self.device)  # for convenience
+
+        self.sd_model = StableDiffusionUnclip(device, fp16)
 
     @torch.no_grad()
     def get_img_embeds(self, x):
         # x: image tensor [B, 3, 256, 256] in [0, 1]
 
-        cs, vs, cadms = [], [], []          # c_crossattn, c_concat 
+        cs, vs, cadms = [], [], []  # c_crossattn, c_concat
         for xx in x:
             if len(xx.shape) == 3:
                 xx = xx.unsqueeze(0)
@@ -136,10 +143,12 @@ class DreamScene(nn.Module):
             vs.append(v)
             cadms.append(cadm)
         return cs, vs, cadms
-    
+
+    def get_text_embeds(self, x):
+        return self.model.get_learned_conditioning(x)
 
     def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
-                   guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path:Path=None):
+                   guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
         # pred_rgb: tensor [1, 3, H, W] in [0, 1]
         # adjust SDS scale based on how far the novel view is from the known view
 
@@ -154,9 +163,9 @@ class DreamScene(nn.Module):
         else:
             pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=False) * 2 - 1
             latents = self.encode_imgs(pred_rgb_256)
-        
+
         t = torch.randint(self.min_step, self.max_step + 1, (latents.shape[0],), dtype=torch.long, device=self.device)
-        
+
         # q sample
         with torch.no_grad():
             noise = torch.randn_like(latents)
@@ -165,21 +174,17 @@ class DreamScene(nn.Module):
             t_in = torch.cat([t] * 2).to(self.device)
 
             noise_preds = []
+            noise_preds_sd = []
             num_imgs = len(embeddings["c_crossattn"])
             for idx in range(num_imgs):
-                
-                c_crossattn, c_concat, c_adm = embeddings["c_crossattn"][idx], embeddings["c_concat"][idx], embeddings["c_adm"][idx]
-                cond = {"c_crossattn": [c_crossattn], "c_concat": [c_concat], "c_adm": c_adm, "pose": pose, 
+
+
+                c_crossattn, c_concat, c_adm = embeddings["c_crossattn"][idx], embeddings["c_concat"][idx], \
+                                               embeddings["c_adm"][idx]
+                cond = {"c_crossattn": [c_crossattn], "c_concat": [c_concat], "c_adm": c_adm, "pose": pose,
                         "intrinsic": intrinsic, "dist": dist.view(1)}
-                # for k, v in cond.items():
-                #     if isinstance(v, (list, tuple)):
-                #         print(k, len(v), v[0].shape)
-                #     elif isinstance(v, torch.Tensor):
-                #         print(k, v.shape)
-                #     else:
-                #         print(k, v)
-                uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)], 
-                          "c_concat": [torch.zeros_like(c_concat)], 'c_adm': torch.zeros_like(c_adm), 
+                uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)],
+                          "c_concat": [torch.zeros_like(c_concat)], 'c_adm': torch.zeros_like(c_adm),
                           "pose": pose, "intrinsic": intrinsic, "dist": dist.view(1)}
                 c_in = dict()
                 for k in cond:
@@ -189,39 +194,56 @@ class DreamScene(nn.Module):
                         c_in[k] = torch.cat([uncond[k], cond[k]])
                     else:
                         c_in[k] = cond[k]
+
             # import pdb; pdb.set_trace()
             model_output, render_rgb = self.model.apply_model(x_in, t_in, c_in, return_rgb=True)
             model_uncond, model_t = model_output.chunk(2)
 
             render_rgb = render_rgb.chunk(2)[1]
             model_output = model_uncond + guidance_scale * (model_t - model_uncond)
+
+            img_embeds = embeddings["c_adm"][0]
+            text_embeds = embeddings['prompt_embeds']
+            neg_text_embeds = embeddings['neg_prompt_embeds']
+            model_output_sd = self.sd_model.unet(x_in, t_in,
+                                      class_labels=torch.cat([torch.zeros_like(img_embeds), img_embeds], dim=0),
+                                      encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0))[0]
+            model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
+            model_output_sd = model_uncond + guidance_scale * (model_t_sd - model_uncond_sd)
             if self.model.parameterization == "v":
                 e_t = self.model.predict_eps_from_z_and_v(latents, t, model_output)
+                e_t_sd = self.sd_model.predict_eps_from_z_and_v(latents, t, model_output_sd)
             else:
                 e_t = model_output
-            
+                e_t_sd = model_output_sd
+
             noise_preds.append(e_t)
+            noise_preds_sd.append(e_t_sd)
         noise_pred = torch.stack(noise_preds).sum(dim=0) / len(noise_preds)
+        noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
         w = (1 - self.alphas[t])
-        grad = (grad_scale * w)[:, None, None, None] * (noise_pred - noise)
+        # grad = (grad_scale * w)[:, None, None, None] * (noise_pred - noise)
+        grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_pred)
         grad = torch.nan_to_num(grad)
 
         if save_guidance_path:
             with torch.no_grad():
                 if as_latent:
                     pred_rgb_256 = self.decode_latents(latents)
-            
+
             # visualize predicted denoised image
-            result_hopefully_less_noisy_image = self.decode_latents(self.model.predict_start_from_noise(latents_noisy, t, noise_pred))   
+            result_hopefully_less_noisy_image = self.decode_latents(
+                self.model.predict_start_from_noise(latents_noisy, t, noise_pred))
             # visualize noisier image
             result_noisier_image = self.decode_latents(latents_noisy)
 
             rendered_imgs = self.decode_latents(render_rgb)
             # all 3 input images are [1, 3, H, W], e.g. [1, 3, 512, 512]
-            viz_images = torch.cat([pred_rgb_256, result_noisier_image, result_hopefully_less_noisy_image, rendered_imgs],dim=-1)
+            viz_images = torch.cat(
+                [pred_rgb_256, result_noisier_image, result_hopefully_less_noisy_image, rendered_imgs], dim=-1)
             save_image(viz_images, save_guidance_path)
-        
+
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
         loss = SpecifyGradient.apply(latents, grad)
 
@@ -230,18 +252,18 @@ class DreamScene(nn.Module):
     # verification
     @torch.no_grad()
     def __call__(self, image, pose, instrinsic, dist,
-            scale=3, ddim_steps=50, ddim_eta=1, h=256, w=256,
-            c_crossattn=None, c_concat=None, c_adm=None, post_process=True
-        ):
-        
+                 scale=3, ddim_steps=50, ddim_eta=1, h=256, w=256,
+                 c_crossattn=None, c_concat=None, c_adm=None, post_process=True
+                 ):
+
         if c_crossattn is None:
             if len(image[0].shape) == 3:
                 image = [img.unsqueeze(0) for img in image]
-            
+
             embeddings = self.get_img_embeds(image)
-            embeddings = {'c_crossattn' : embeddings[0],
-                          'c_concat' : embeddings[1],
-                          'c_adm': embeddings[2],}
+            embeddings = {'c_crossattn': embeddings[0],
+                          'c_concat': embeddings[1],
+                          'c_adm': embeddings[2], }
 
             # import pdb; pdb.set_trace()
             c_crossattn = embeddings["c_crossattn"]
@@ -252,15 +274,16 @@ class DreamScene(nn.Module):
             instrinsic = instrinsic.repeat(n_pose, 1)
             dist = dist.view(1).repeat(n_pose)
         pose = torch.cat(pose.unbind(dim=1), dim=0)
-        
+
         if c_concat is None:
             c_concat = embeddings["c_concat"]
             recons = self.model.decode_first_stage(c_concat[0])
-        
+
         if c_adm is None:
             c_adm = embeddings["c_adm"]
-        
-        cond = {"c_crossattn": c_crossattn, "c_concat": c_concat, "c_adm": c_adm[0], "pose": pose, "intrinsic": instrinsic, "dist": dist}
+
+        cond = {"c_crossattn": c_crossattn, "c_concat": c_concat, "c_adm": c_adm[0], "pose": pose,
+                "intrinsic": instrinsic, "dist": dist}
         for k, v in cond.items():
             if isinstance(v, (list, tuple)):
                 print(k, len(v), v[0].shape)
@@ -268,9 +291,10 @@ class DreamScene(nn.Module):
                 print(k, v.shape)
             else:
                 print(k, v)
-        uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)], "c_concat": [torch.zeros_like(c_concat[0])], 
+        uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)],
+                  "c_concat": [torch.zeros_like(c_concat[0])],
                   'c_adm': torch.zeros_like(c_adm[0]), "pose": pose, "intrinsic": instrinsic, "dist": dist.view(1)}
-        
+
         # produce latents loop
         latents = torch.randn((1, 4, h // 8, w // 8), device=self.device)
         self.scheduler.set_timesteps(ddim_steps)
@@ -296,22 +320,24 @@ class DreamScene(nn.Module):
             else:
                 e_t = model_output
             latents = self.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
-        
+
         imgs = self.decode_latents(latents)
         imgs = imgs.cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
         render_rgb = self.decode_latents(render_rgb)
         render_rgb = render_rgb.cpu().numpy().transpose(0, 2, 3, 1) if post_process else render_rgb
-        return imgs, render_rgb, recons.cpu().numpy().transpose(0, 2, 3, 1) if post_process else recons 
-    
+        return imgs, render_rgb, recons.cpu().numpy().transpose(0, 2, 3, 1) if post_process else recons
+
     def decode_latents(self, latents):
 
         imgs = self.model.decode_first_stage(latents)
-        imgs = torch.clamp((imgs + 1.0) / 2.0, min=0.0, max=1.0) 
+        imgs = torch.clamp((imgs + 1.0) / 2.0, min=0.0, max=1.0)
         return imgs
-    
+
     def encode_imgs(self, imgs):
-        latents = torch.cat([self.model.get_first_stage_encoding(self.model.encode_first_stage(img.unsqueeze(0))) for img in imgs], dim=0)
-        return latents # [B, 4, 32, 32] Latent space image
+        latents = torch.cat(
+            [self.model.get_first_stage_encoding(self.model.encode_first_stage(img.unsqueeze(0))) for img in imgs],
+            dim=0)
+        return latents  # [B, 4, 32, 32] Latent space image
 
 
 def get_numpy_image(image_filename, shape=None, scale_factor=1.0):
@@ -345,9 +371,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     # parser.add_argument('input', type=str, default="/mnt/cache_sail/views_release/4a03d2eceba847ea897f0944e8a57ab3/010.png")
-    parser.add_argument('--fp16', action='store_true', help="use float16 for training") # no use now, can only run in fp32
+    parser.add_argument('--fp16', action='store_true',
+                        help="use float16 for training")  # no use now, can only run in fp32
 
-    parser.add_argument('--posefile', type=str, default="/mnt/cache_sail/liulj/stable-dreamfusion/ds_tests/posefile.json", help="json file, consists of at least one conditional RT and one target RT, in world2cam format")
+    parser.add_argument('--posefile', type=str,
+                        default="/mnt/cache_sail/liulj/stable-dreamfusion/ds_tests/posefile.json",
+                        help="json file, consists of at least one conditional RT and one target RT, in world2cam format")
 
     opt = parser.parse_args()
     device = torch.device('cuda')
@@ -367,15 +396,16 @@ if __name__ == "__main__":
     else:
         # 4x4
         cond_RT = torch.from_numpy(np.array(cams_file["cond_rt"]))
-    
-    relative_poses = torch.cat([(cond_RT @ torch.linalg.inv(target_RTs[i])).unsqueeze(0) for i in range(target_RTs.shape[0])], dim=0).unsqueeze(0)
+
+    relative_poses = torch.cat(
+        [(cond_RT @ torch.linalg.inv(target_RTs[i])).unsqueeze(0) for i in range(target_RTs.shape[0])],
+        dim=0).unsqueeze(0)
     print(f"cond_RT: {cond_RT.shape}, \n{cond_RT}")
     # print(f"target_RT: {target_RT.shape}")
     # relative_poses = cond_RT @ torch.linalg.inv(target_RT)
     # print(f"relative pose: \n{relative_poses}")
     # relative_poses = relative_poses.unsqueeze(0)[:, :3, :4].unsqueeze(0)
     print(f"relative pose: {relative_poses.shape}")
-
 
     source_dist = torch.norm(cond_RT[:3, 3], p=2)
     intrinsic = torch.from_numpy(np.array([560 * 0.5, 256 * 0.5])).view(1, -1)
@@ -395,7 +425,6 @@ if __name__ == "__main__":
 
     print(f'[INFO] loading model ...')
     model = DreamScene(device, opt.fp16)
-    
 
     outputs = model([image], pose=relative_poses, instrinsic=intrinsic, dist=source_dist)
     images, renders, recons = outputs
@@ -405,21 +434,3 @@ if __name__ == "__main__":
         Image.fromarray((images[idx] * 255.0).astype(np.uint8)).save(f"debug_res/{idx}_rgb.png")
         Image.fromarray((renders[idx] * 255.0).astype(np.uint8)).save(f"debug_res/{idx}_render.png")
         Image.fromarray((recons[idx] * 255.0).astype(np.uint8)).save(f"debug_res/{idx}_recon.png")
-        
-
-
-    
-
-
-        
-        
-        
-
-
-
-
-
-
-
-
-
