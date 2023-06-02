@@ -210,7 +210,7 @@ class DreamScene(nn.Module):
                 encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0)
             )[0]
             model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
-            model_output_sd = model_uncond + guidance_scale * (model_t_sd - model_uncond_sd)
+            model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
             if self.model.parameterization == "v":
                 e_t = self.model.predict_eps_from_z_and_v(latents_noisy, t, model_output)
                 e_t_sd = self.model.predict_eps_from_z_and_v(latents_noisy, t, model_output_sd)
