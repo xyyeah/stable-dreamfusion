@@ -126,6 +126,36 @@ class ControlLDM(LatentDiffusion):
         else:
             self.noise_augmentor = None
 
+    
+    @torch.no_grad()
+    def get_img_embeds(self, imgs, bs=None, noise_level=None, *args, **kwargs):
+        # imgs: image tensor [B, h, w, c] 
+        # import pdb; pdb.set_trace()
+
+        batch = {self.first_stage_key: torch.zeros_like(imgs), self.control_key: imgs, self.cond_stage_key: ["a photo of object"]}
+        x, c = super().get_input(batch, self.first_stage_key)
+        control = batch[self.control_key]
+        if bs is not None:
+            control = control[:bs]
+        
+        control = control.to(self.device)
+        control = einops.rearrange(control, 'b h w c -> b c h w')
+        control = control.to(memory_format=torch.contiguous_format).float()
+
+        c_adm = self.embedder(control)
+        if self.noise_augmentor is not None:
+            print(f"noise_level: {noise_level}")
+            if noise_level is None:
+                noise_level = torch.tensor([0]).long().to(x.device)
+            c_adm, noise_level_emb = self.noise_augmentor(c_adm, noise_level=noise_level)
+            # assume this gives embeddings of noise levels
+            c_adm = torch.cat((c_adm, noise_level_emb), 1)
+
+        encoder_posterior = self.encode_first_stage(control)
+        control = self.get_first_stage_encoding(encoder_posterior).detach()
+        return c, control, c_adm
+
+
     @torch.no_grad()
     def get_input(self, batch, k, bs=None, noise_level=None, *args, **kwargs):
         n_pose = batch['pose'].size(1)
@@ -146,7 +176,8 @@ class ControlLDM(LatentDiffusion):
 
         c_adm = self.embedder(control)
         if self.noise_augmentor is not None:
-            c_adm, noise_level_emb = self.noise_augmentor(c_adm, noise_level)
+            print(f"noise_level: {noise_level}")
+            c_adm, noise_level_emb = self.noise_augmentor(c_adm, noise_level=noise_level)
             # assume this gives embeddings of noise levels
             c_adm = torch.cat((c_adm, noise_level_emb), 1)
         if self.training:
@@ -161,9 +192,11 @@ class ControlLDM(LatentDiffusion):
         return x, dict(c_crossattn=[c.repeat(n_pose, 1, 1)], c_concat=[control], c_adm=c_adm,
                        pose=batch['pose'].cpu(), intrinsic=batch["intrinsic"].cpu(), dist=batch["dist"].cpu())
 
+
     def apply_model(self, x_noisy, t, cond, return_rgb=False, *args, **kwargs):
         assert isinstance(cond, dict)
         diffusion_model = self.model.diffusion_model
+        # import pdb; pdb.set_trace()
 
         cond_txt = torch.cat(cond['c_crossattn'], 1)
         c_adm = cond['c_adm']
@@ -305,6 +338,7 @@ class ControlLDM(LatentDiffusion):
             x_samples_cfg = self.decode_first_stage(samples_cfg)
             log[f"samples_cfg_scale_{unconditional_guidance_scale:.2f}"] = x_samples_cfg
             log['view'] = self.decode_first_stage(intermediates['rgb'][-1])
+
 
         result_grid = make_grid(
             torch.cat([
@@ -708,8 +742,14 @@ class Render(nn.Module):
         return self.flow_grid[:batchsize].to(device)
 
     def forward(self, x_t, timesteps, context, x, pose, intrinsic, dist, y):
+
+        # import pdb; pdb.set_trace()
+        context = None
+
         H, W = 32, 32
         label_emb = self.label_emb(y)
+        input_x = x
+
         x = self.tri_generator(x, emb=label_emb, pad=0)  # yx, zx, zy
 
         if pose.size(0) != x[0].size(0):
@@ -730,6 +770,7 @@ class Render(nn.Module):
         B, _, H, W = yx.size()
 
         positions, ray_samples = self.sample_points(yx, pose, intrinsic, dist)
+
 
         def get_density(field, coords):
             plane_features = [
