@@ -194,7 +194,7 @@ if __name__ == '__main__':
     # parameters for image-conditioned generation
     if opt.image is not None or opt.image_config is not None:
 
-        if opt.text is None:
+        if opt.text is None or True:
             # use zero123 guidance model when only providing image
             if opt.zero123:
                 opt.guidance = ['zero123']
