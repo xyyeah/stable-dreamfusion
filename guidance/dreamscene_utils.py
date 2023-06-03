@@ -190,7 +190,7 @@ class DreamScene(nn.Module):
             noise_preds_sd = []
             num_imgs = len(embeddings["c_crossattn"])
 
-            noise_768 = F.interpolate(noise, (256, 256), mode="nearest")
+            noise_768 = F.interpolate(noise, (32, 32), mode="nearest")
             latents_noisy_768 = self.scheduler.add_noise(latents_768, noise_768, t)
             x_in = torch.cat([latents_noisy_768] * 2)
 
