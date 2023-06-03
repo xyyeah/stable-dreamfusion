@@ -130,6 +130,7 @@ class DreamScene(nn.Module):
         self.alphas = self.scheduler.alphas_cumprod.to(self.device)  # for convenience
 
         self.sd_model = StableDiffusionUnclip(device, fp16, False)
+        self.sd_model2 = StableDiffusion(device, fp16, False)
         # del self.model.vae.decoder
 
     @torch.no_grad()
@@ -175,10 +176,10 @@ class DreamScene(nn.Module):
             latents = F.interpolate(pred_rgb, (32, 32), mode="bilinear", align_corners=True) * 2 - 1
         else:
             pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=True) * 2 - 1
-            latents = self.encode_imgs(pred_rgb_256)
+            latents = self.sd_model2.encode_imgs(pred_rgb_256)
 
             pred_rgb_768 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=True) * 2 - 1
-            latents_768 = self.sd_model.encode_imgs(pred_rgb_768)
+            latents_768 = self.sd_model2.encode_imgs(pred_rgb_768)
 
         t = torch.randint(self.min_step, self.max_step + 1, (latents_768.shape[0],), dtype=torch.long,
                           device=self.device)
