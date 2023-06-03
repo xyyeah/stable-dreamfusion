@@ -341,8 +341,8 @@ class NeRFPoseDataset:
 
         relative_pose = [cond_rt @ torch.linalg.inv(w2c[idx]) for idx in range(len(w2c))]
         # print(f"relative_pose: \n{relative_pose}")
-        source_dist = torch.norm(cond_rt[:3, 3], p=2)
-        source_dist = torch.tensor(1.6).float()
+        source_dist = torch.norm(cond_rt[:3, 3], p=2) * 0.5
+        # source_dist = torch.tensor(1.6).float()
 
         data = {
             'H': self.H,
