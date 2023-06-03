@@ -316,6 +316,7 @@ class DreamScene(nn.Module):
                 encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0)
             )[0]
             model_uncond, model_t = model_output.chunk(2)
+            assert not torch.isnan(model_output).any()
             model_output = model_uncond + scale * (model_t - model_uncond)
             # if self.model.parameterization == "v":
             #     e_t = self.model.predict_eps_from_z_and_v(latents, t.view(1).to(self.device), model_output)
