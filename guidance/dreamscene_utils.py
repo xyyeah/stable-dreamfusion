@@ -249,7 +249,7 @@ class DreamScene(nn.Module):
         # grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_pred)
         grad = (grad_scale * w)[:, None, None, None] * (-noise_pred)
         grad2 = (grad_scale * w)[:, None, None, None] * noise_pred_sd
-        grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise)
+        grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_768)
         grad = torch.nan_to_num(grad)
         grad2 = torch.nan_to_num(grad2)
 
