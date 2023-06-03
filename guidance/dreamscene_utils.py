@@ -303,6 +303,7 @@ class DreamScene(nn.Module):
             neg_text_embeds = torch.zeros_like(neg_text_embeds)
 
             for i, t in enumerate(self.scheduler.timesteps):
+                t_int = t
                 t = torch.full((1,), t, device=self.device, dtype=torch.long)
                 print(i, t)
                 x_in = torch.cat([latents] * 2)
@@ -330,8 +331,8 @@ class DreamScene(nn.Module):
                 else:
                     e_t = model_output
                 assert not torch.isnan(model_output).any()
-                print('fuck', t.device, self.sd_model.model.alphas_cumprod.device, e_t.device, latents.device)
-                latents = self.scheduler.step(e_t, t.cpu(), latents, eta=ddim_eta)['prev_sample']
+                # print('fuck', t.device, self.sd_model.model.alphas_cumprod.device, e_t.device, latents.device)
+                latents = self.scheduler.step(e_t, t_int, latents, eta=ddim_eta)['prev_sample']
 
             imgs = self.decode_latents(latents)
             print(imgs.amax(), imgs.amin(), imgs.mean())
