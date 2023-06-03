@@ -129,7 +129,7 @@ class DreamScene(nn.Module):
         self.max_step = int(self.num_train_timesteps * t_range[1])
         self.alphas = self.scheduler.alphas_cumprod.to(self.device)  # for convenience
 
-        self.sd_model = StableDiffusion(device, fp16, False)
+        self.sd_model = StableDiffusionUnclip(device, fp16, False)
         # del self.model.vae.decoder
 
     @torch.no_grad()
@@ -195,32 +195,35 @@ class DreamScene(nn.Module):
             latents_noisy_768 = self.scheduler.add_noise(latents_768, noise_768, t)
             x_in = torch.cat([latents_noisy_768] * 2)
 
-            model_output_sd = self.sd_model.unet(x_in, t_in, encoder_hidden_states=text_embeddings).sample
+            # model_output_sd = self.sd_model.unet(x_in, t_in, encoder_hidden_states=text_embeddings).sample
 
-            # img_embeds = embeddings["c_adm"][0]
-            # text_embeds = embeddings['prompt_embeds']
-            # neg_text_embeds = embeddings['neg_prompt_embeds']
-            # cond = {"c_crossattn": [text_embeds], "c_adm": img_embeds}
-            # uncond = {"c_crossattn": [neg_text_embeds], 'c_adm': torch.zeros_like(img_embeds)}
-            # c_in = dict()
-            # for k in cond:
-            #     if isinstance(cond[k], list):
-            #         c_in[k] = [torch.cat([uncond[k][i], cond[k][i]]) for i in range(len(cond[k]))]
-            #     elif isinstance(cond[k], torch.Tensor):
-            #         c_in[k] = torch.cat([uncond[k], cond[k]])
-            #     else:
-            #         c_in[k] = cond[k]
-            # model_output_sd = self.sd_model.model.apply_model(x_in, t_in, c_in)
-
+            img_embeds = embeddings["c_adm"][0]
+            text_embeds = embeddings['prompt_embeds']
+            neg_text_embeds = embeddings['neg_prompt_embeds']
+            cond = {"c_crossattn": [text_embeds], "c_adm": img_embeds}
+            uncond = {"c_crossattn": [neg_text_embeds], 'c_adm': torch.zeros_like(img_embeds)}
+            c_in = dict()
+            for k in cond:
+                if isinstance(cond[k], list):
+                    c_in[k] = [torch.cat([uncond[k][i], cond[k][i]]) for i in range(len(cond[k]))]
+                elif isinstance(cond[k], torch.Tensor):
+                    c_in[k] = torch.cat([uncond[k], cond[k]])
+                else:
+                    c_in[k] = cond[k]
+            model_output_sd = self.sd_model.model.apply_model(x_in, t_in, c_in)
             model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
             model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
-            e_t_sd = model_output_sd
+            e_t_sd = self.model.predict_eps_from_z_and_v(latents_noisy_768, t, model_output_sd)
+
+            # model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
+            # model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
+            # e_t_sd = model_output_sd
 
             noise_preds_sd.append(e_t_sd)
         noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
         w = (1 - self.sd_model.alphas[t])
-        grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_768)
+        grad = (grad_scale * w)[:, None, None, None] * (latents_noisy_768 - noise_768)
         grad = torch.nan_to_num(grad)
         # grad2 = torch.nan_to_num(grad2)
 
@@ -521,7 +524,7 @@ class DreamScene(nn.Module):
 
     def encode_imgs(self, imgs):
         latents = torch.cat(
-            [self.model.get_first_stage_encoding(self.model.encode_first_stage(img.unsqueeze(0)).dist) for img in imgs],
+            [self.model.get_first_stage_encoding(self.model.encode_first_stage(img.unsqueeze(0))) for img in imgs],
             dim=0)
         return latents  # [B, 4, 32, 32] Latent space image
 
