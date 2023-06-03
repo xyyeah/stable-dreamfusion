@@ -246,7 +246,7 @@ class DreamScene(nn.Module):
             save_image(viz_images, save_guidance_path)
 
         loss = SpecifyGradient.apply(latents_768, grad)
-
+        print(loss1, loss)
         return loss1 + 0.1 * loss
 
     # def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
