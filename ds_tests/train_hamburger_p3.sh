@@ -8,9 +8,9 @@
 python3.9 main.py -O --image /mnt/cache_sail/liulj/stable-dreamfusion/data/hamburger_rgba.png \
         --workspace dreamscene/hamburger_phrase1_param3 --iters 10000 --dreamscene --posefile "" \
         --dreamscene_ckpt /home/liulj/latest.ckpt --save_guidance --save_guidance_interval 50 \
-        --ckpt scratch --batch_size 1 --h 64 --w 64 --fovy_range 20 20 --default_fovy 20 --guidance_scale 50 \
+        --ckpt scratch --batch_size 1 --h 64 --w 64 --fovy_range 10 30 --default_fovy 20 --guidance_scale 50 \
         --lambda_3d_normal_smooth 10 --dont_override_stuff --test_interval 2 \
-        --default_radius 3.2 --radius_range 3.2 3.6 --optim adam --lr 0.001 
+        --default_radius 2.0 --radius_range 1.6 2.4 --optim adam --lr 0.001
 
 # Phase 2
 # 20X smaller lambda_3d_normal_smooth, --known_view_interval 2, 3X LR

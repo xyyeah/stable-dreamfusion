@@ -7,11 +7,11 @@
  python3.9 main.py -O --image ./data/teddy_rgba.png \
          --workspace /workspace/teddy_vsd --iters 10000 --dreamscene --posefile "" \
          --save_guidance --save_guidance_interval 50 \
-         --ckpt scratch --batch_size 1 --h 96 --w 96 --fovy_range 20 20 --default_fovy 20 --guidance_scale 7.5 \
+         --ckpt scratch --batch_size 1 --h 96 --w 96 --fovy_range 10 30 --default_fovy 20 --guidance_scale 7.5 \
          --dont_override_stuff --test_interval 2 \
          --text "a brown teddy bear sitting on a ground" --negative "low quality" \
          --lambda_2d_normal_smooth 10.0 \
-         --default_radius 3.2 --radius_range 3.2 3.6
+         --default_radius 2.0 --radius_range 1.6 2.4
 
 # # # Phase 1
 # python3.9 main.py -O --image /mnt/cache_sail/liulj/stable-dreamfusion/data/teddy_rgba.png \
