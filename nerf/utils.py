@@ -383,7 +383,7 @@ class Trainer(object):
                      rgbas])
                 rgbs_256 = rgba_256[..., :3] * rgba_256[..., 3:] + (1 - rgba_256[..., 3:])
                 rgb_256 = torch.from_numpy(rgbs_256).contiguous().to(self.device)
-                guidance_embeds = self.guidance["dreamscene"].get_img_embeds(rgb_256)
+                guidance_embeds = self.guidance["dreamscene"].get_img_embeds(2.0 * rgb_256 - 1.0)
                 if "default" in self.embeddings["dreamscene"]:
                     print('fuck', self.opt.text, self.opt.negative)
                     self.embeddings["dreamscene"]["default"].update({
