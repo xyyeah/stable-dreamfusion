@@ -104,7 +104,6 @@ def rand_poses(size, device, opt, radius_range=[1, 1.5], theta_range=[0, 120], p
         phis = torch.atan2(unit_centers[:, 0], unit_centers[:, 2])
         phis[phis < 0] += 2 * np.pi
         centers = unit_centers * radius.unsqueeze(-1)
-        centers = torch.zeros_like(centers)
     else:
         thetas = torch.rand(size, device=device) * (theta_range[1] - theta_range[0]) + theta_range[0]
         phis = torch.rand(size, device=device) * (phi_range[1] - phi_range[0]) + phi_range[0]
@@ -115,7 +114,6 @@ def rand_poses(size, device, opt, radius_range=[1, 1.5], theta_range=[0, 120], p
             radius * torch.cos(thetas),
             radius * torch.sin(thetas) * torch.cos(phis),
         ], dim=-1)  # [B, 3]
-        centers = torch.zeros_like(centers)
 
     targets = 0
 
@@ -268,6 +266,7 @@ class NeRFPoseDataset:
         print(
             f"ref={[self.opt.ref_radii, self.opt.ref_polars, self.opt.ref_azimuths]}, cond/default={[self.opt.default_radius, self.opt.default_polar, self.opt.default_azimuth]}")
         print(f"relative_pose: \n{relative_pose}")
+        print(f"projection: \n{projection}")
 
         data = {
             'H': H,
@@ -328,6 +327,8 @@ class NeRFPoseDataset:
              -(2 * self.far * self.near) / (self.far - self.near)],
             [0, 0, -1, 0]
         ], dtype=torch.float32, device=self.device).unsqueeze(0)
+        print(projection)
+        exit(0)
 
         mvp = projection @ torch.inverse(poses)  # [1, 4, 4]
 
