@@ -277,7 +277,7 @@ class DreamScene(nn.Module):
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
         loss = SpecifyGradient.apply(latents, grad) + SpecifyGradient.apply(latents_768, grad2)
 
-        return loss + 2.0 * F.mse_loss(render_rgb, latents)
+        return loss # + 2.0 * F.mse_loss(render_rgb, latents)
 
     def __call__(self, image, text,
                  scale=3, ddim_steps=50, ddim_eta=0.0, h=768, w=768,
