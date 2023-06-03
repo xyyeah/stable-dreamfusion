@@ -321,7 +321,7 @@ class DreamScene(nn.Module):
                     else:
                         c_in[k] = cond[k]
 
-                model_output = self.sd_model.apply_model(x_in, t_in, c_in)
+                model_output = self.sd_model.model.apply_model(x_in, t_in, c_in)
                 model_uncond, model_t = model_output.chunk(2)
 
                 model_output = model_uncond + scale * (model_t - model_uncond)
