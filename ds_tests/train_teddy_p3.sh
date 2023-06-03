@@ -10,7 +10,7 @@
          --ckpt scratch --batch_size 1 --h 96 --w 96 --fovy_range 10 30 --default_fovy 20 --guidance_scale 7.5 \
          --dont_override_stuff --test_interval 2 \
          --text "a brown teddy bear sitting on a ground" --negative "low quality" \
-         --lambda_2d_normal_smooth 10.0 \
+         --lambda_2d_normal_smooth 10.0 --lambda_depth 0.0 --lamba_rgb 0.0 \
          --default_radius 2.0 --radius_range 1.6 2.4
 
 # # # Phase 1
