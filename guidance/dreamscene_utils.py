@@ -496,7 +496,8 @@ if __name__ == "__main__":
     print(f'[INFO] loading model ...')
     model = DreamScene(device, opt.fp16)
 
-    outputs = model([image], ["teddy bear"])
+    with torch.cuda.amp.autocast(enabled=opt.fp16):
+        outputs = model([image], ["teddy bear"])
     images, recons = outputs
     os.makedirs("debug_res", exist_ok=True)
     for idx in range(images.shape[0]):
