@@ -191,7 +191,8 @@ class StableDiffusion(nn.Module):
 
         # w(t), sigma_t^2
         w = (1 - self.alphas[t])
-        grad = grad_scale * w[:, None, None, None] * (noise_pred - noise)
+        # grad = grad_scale * w[:, None, None, None] * (noise_pred - noise)
+        grad = grad_scale * w[:, None, None, None] * noise_pred
         grad = torch.nan_to_num(grad)
 
         if save_guidance_path:
