@@ -567,8 +567,6 @@ class Trainer(object):
             gt_rgb = gt_rgb * gt_mask[:, None].float() + bg_color.reshape(B, H, W, 3).permute(0, 3, 1,
                                                                                               2).contiguous() * (
                              1 - gt_mask[:, None].float())
-            print(gt_rgb.amin(), gt_rgb.amax())
-            exit(0)
             loss = self.opt.lambda_rgb * F.mse_loss(pred_rgb, gt_rgb)
 
             # mask loss

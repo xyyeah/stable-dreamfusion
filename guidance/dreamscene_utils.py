@@ -244,8 +244,7 @@ class DreamScene(nn.Module):
 
         if save_guidance_path:
             with torch.no_grad():
-                if as_latent:
-                    pred_rgb_256 = self.decode_latents(latents)
+                pred_rgb_256 = torch.clamp((pred_rgb_256 + 1.0) / 2.0, min=0.0, max=1.0)
 
             # visualize predicted denoised image
             result_hopefully_less_noisy_image = self.decode_latents(
