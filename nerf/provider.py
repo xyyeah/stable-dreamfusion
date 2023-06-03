@@ -285,8 +285,10 @@ class NeRFPoseDataset:
     def collate(self, index):
         B = len(index)
 
-        H = int(self.opt.known_view_scale * self.H)
-        W = int(self.opt.known_view_scale * self.W)
+        # H = int(self.opt.known_view_scale * self.H)
+        # W = int(self.opt.known_view_scale * self.W)
+        H = int(self.H)
+        W = int(self.W)
         cx = H / 2
         cy = W / 2
 
