@@ -502,6 +502,6 @@ if __name__ == "__main__":
     os.makedirs("debug_res", exist_ok=True)
     for idx in range(images.shape[0]):
         # import pdb; pdb.set_trace()
-        Image.fromarray((images[idx] * 255.0).astype(np.uint8)).save(f"/workspace/debug_res/{idx}_rgb.png")
+        Image.fromarray((images[idx] * 255.0).astype(np.uint8)).save(f"/workspace/{idx}_rgb.png")
         # Image.fromarray((renders[idx] * 255.0).astype(np.uint8)).save(f"debug_res/{idx}_render.png")
-        Image.fromarray((recons[idx] * 255.0).astype(np.uint8)).save(f"/workspace/debug_res/{idx}_recon.png")
+        Image.fromarray((recons[idx] * 255.0).astype(np.uint8)).save(f"/workspace/{idx}_recon.png")
