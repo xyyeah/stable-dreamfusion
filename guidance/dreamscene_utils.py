@@ -300,7 +300,7 @@ class DreamScene(nn.Module):
 
         img_embeds = torch.zeros_like(img_embeds)
         text_embeds = torch.zeros_like(text_embeds)
-        neg_text_embeds = torch.zeros(neg_text_embeds)
+        neg_text_embeds = torch.zeros_like(neg_text_embeds)
 
         for i, t in enumerate(self.sd_model.scheduler.timesteps):
             print(i)
