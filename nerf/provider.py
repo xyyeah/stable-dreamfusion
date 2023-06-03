@@ -229,6 +229,9 @@ class NeRFPoseDataset:
         poses, dirs = circle_poses(self.device, radius=radii, theta=thetas, phi=phis, return_dirs=True,
                                    angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
         fov = self.opt.default_fovy
+
+        default_focal, default_cx = 560 * 0.5, 256 * 0.5
+        fov = np.rad2deg(2 * np.arctan(default_cx / default_focal))
         focal = H / (2 * np.tan(np.deg2rad(fov) / 2))
         intrinsics = np.array([focal, focal, cx, cy])
 
@@ -312,15 +315,16 @@ class NeRFPoseDataset:
                                        angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
             fov = self.opt.default_fovy
 
+        # focal = H / (2 * tan(fov/2))
+        # H / focal  / 2 = tan(fov/2)
         default_focal, default_cx = 560 * 0.5, 256 * 0.5
+        fov = np.rad2deg(2 * np.arctan(default_cx / default_focal))
+        # fscale = self.H / 2 / default_cx
+        # focal, cx = default_focal * fscale, default_cx * fscale
+        # intrinsics = np.array([focal, focal, cx, cx])
 
-        fscale = self.H / 2 / default_cx
-        focal, cx = default_focal * fscale, default_cx * fscale
+        focal = self.H / (2 * np.tan(np.deg2rad(fov) / 2))
         intrinsics = np.array([focal, focal, cx, cx])
-
-        # focal = self.H / (2 * np.tan(np.deg2rad(fov) / 2))
-        # intrinsics = np.array([focal, focal, self.cx, self.cy])
-
 
         projection = torch.tensor([
             [2 * focal / self.W, 0, 0, 0],
