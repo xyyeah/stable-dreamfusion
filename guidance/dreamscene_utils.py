@@ -133,13 +133,13 @@ class DreamScene(nn.Module):
 
     @torch.no_grad()
     def get_img_embeds(self, x):
-        # x: image tensor [B, 3, 256, 256] in [0, 1]
+        # x: image tensor [B, 3, 256, 256] in [-1, 1]
 
         cs, vs, cadms = [], [], []  # c_crossattn, c_concat
         for xx in x:
             if len(xx.shape) == 3:
                 xx = xx.unsqueeze(0)
-            c, v, cadm = self.model.get_img_embeds(2.0 * xx - 1.0)
+            c, v, cadm = self.model.get_img_embeds(xx)
             cs.append(c)
             vs.append(v)
             cadms.append(cadm)
@@ -288,7 +288,6 @@ class DreamScene(nn.Module):
                           'c_adm': embeddings[2], }
 
             # import pdb; pdb.set_trace()
-            c_crossattn = embeddings["c_crossattn"]
         # import pdb; pdb.set_trace()
         # produce latents loop
         latents = torch.randn((1, 4, h // 8, w // 8), device=self.device)
@@ -438,7 +437,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from PIL import Image
     import json
-
+    #
     parser = argparse.ArgumentParser()
     # parser.add_argument('input', type=str, default="/mnt/cache_sail/views_release/4a03d2eceba847ea897f0944e8a57ab3/010.png")
     parser.add_argument('--fp16', action='store_true',
@@ -450,46 +449,46 @@ if __name__ == "__main__":
 
     opt = parser.parse_args()
     device = torch.device('cuda')
+    #
+    # print(f'[INFO] loading poses from {opt.posefile} ...')
+    #
+    # cams_file = json.load(open(opt.posefile, "r"))
+    # # Nx4x4
+    # target_RTs = []
+    # for target in cams_file["targets"]:
+    #     target_RT = target["target_rt"]
+    #     target_RTs.append(torch.from_numpy(np.array(target_RT)))
+    # target_RTs = torch.stack(target_RTs)
+    # if "cond_rt" not in cams_file:
+    #     # 4x4
+    #     cond_RT = torch.from_numpy(target_RTs[0])
+    # else:
+    #     # 4x4
+    #     cond_RT = torch.from_numpy(np.array(cams_file["cond_rt"]))
+    #
+    # relative_poses = torch.cat(
+    #     [(cond_RT @ torch.linalg.inv(target_RTs[i])).unsqueeze(0) for i in range(target_RTs.shape[0])],
+    #     dim=0).unsqueeze(0)
+    # print(f"cond_RT: {cond_RT.shape}, \n{cond_RT}")
+    # # print(f"target_RT: {target_RT.shape}")
+    # # relative_poses = cond_RT @ torch.linalg.inv(target_RT)
+    # # print(f"relative pose: \n{relative_poses}")
+    # # relative_poses = relative_poses.unsqueeze(0)[:, :3, :4].unsqueeze(0)
+    # print(f"relative pose: {relative_poses.shape}")
+    #
+    # source_dist = torch.norm(cond_RT[:3, 3], p=2)
+    # intrinsic = torch.from_numpy(np.array([560 * 0.5, 256 * 0.5])).view(1, -1)
+    #
+    # cond_img_file = cams_file["cond_imgfile"]
+    # print(f'[INFO] loading image from {cond_img_file} ...')
 
-    print(f'[INFO] loading poses from {opt.posefile} ...')
-
-    cams_file = json.load(open(opt.posefile, "r"))
-    # Nx4x4
-    target_RTs = []
-    for target in cams_file["targets"]:
-        target_RT = target["target_rt"]
-        target_RTs.append(torch.from_numpy(np.array(target_RT)))
-    target_RTs = torch.stack(target_RTs)
-    if "cond_rt" not in cams_file:
-        # 4x4
-        cond_RT = torch.from_numpy(target_RTs[0])
-    else:
-        # 4x4
-        cond_RT = torch.from_numpy(np.array(cams_file["cond_rt"]))
-
-    relative_poses = torch.cat(
-        [(cond_RT @ torch.linalg.inv(target_RTs[i])).unsqueeze(0) for i in range(target_RTs.shape[0])],
-        dim=0).unsqueeze(0)
-    print(f"cond_RT: {cond_RT.shape}, \n{cond_RT}")
-    # print(f"target_RT: {target_RT.shape}")
-    # relative_poses = cond_RT @ torch.linalg.inv(target_RT)
-    # print(f"relative pose: \n{relative_poses}")
-    # relative_poses = relative_poses.unsqueeze(0)[:, :3, :4].unsqueeze(0)
-    print(f"relative pose: {relative_poses.shape}")
-
-    source_dist = torch.norm(cond_RT[:3, 3], p=2)
-    intrinsic = torch.from_numpy(np.array([560 * 0.5, 256 * 0.5])).view(1, -1)
-
-    cond_img_file = cams_file["cond_imgfile"]
-    print(f'[INFO] loading image from {cond_img_file} ...')
-
-    image = get_numpy_image(cond_img_file, shape=(256, 256))
+    image = get_numpy_image('./data/teddy.png', shape=(256, 256))
     image = (image.astype(np.float32) / 255.0) * 2 - 1
     image = torch.from_numpy(image).to(device)
 
     print(f"image: {image.shape}")
-    print(f"relative_poses: {relative_poses.shape}")
-    print(f"intrinsic: {intrinsic.shape}")
+    # print(f"relative_poses: {relative_poses.shape}")
+    # print(f"intrinsic: {intrinsic.shape}")
 
     # import pdb; pdb.set_trace()
 
