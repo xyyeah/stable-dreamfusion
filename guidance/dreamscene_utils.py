@@ -303,9 +303,10 @@ class DreamScene(nn.Module):
             neg_text_embeds = torch.zeros_like(neg_text_embeds)
 
             for i, t in enumerate(self.scheduler.timesteps):
+                t = torch.full((1,), t, device=device, dtype=torch.long)
                 print(i, t)
                 x_in = torch.cat([latents] * 2)
-                t_in = torch.cat([t.view(1)] * 2).to(self.device)
+                t_in = torch.cat([t] * 2).to(self.device)
 
                 assert not torch.isnan(x_in).any()
                 assert not torch.isnan(t_in).any()
@@ -323,14 +324,13 @@ class DreamScene(nn.Module):
 
                 model_output = self.sd_model.model.apply_model(x_in, t_in, c_in)
                 model_uncond, model_t = model_output.chunk(2)
-
                 model_output = model_uncond + scale * (model_t - model_uncond)
                 if self.model.parameterization == "v":
-                    e_t = self.model.predict_eps_from_z_and_v(latents, t, model_output)
+                    e_t = self.model.predict_eps_from_z_and_v(latents, t_in, model_output)
                 else:
                     e_t = model_output
                 assert not torch.isnan(model_output).any()
-                latents = self.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
+                latents = self.scheduler.step(e_t, t_in, latents, eta=ddim_eta)['prev_sample']
 
             imgs = self.decode_latents(latents)
             print(imgs.amax(), imgs.amin(), imgs.mean())
