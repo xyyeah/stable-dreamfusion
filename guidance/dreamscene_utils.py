@@ -178,7 +178,7 @@ class DreamScene(nn.Module):
             pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=True) * 2 - 1
             latents = self.sd_model2.encode_imgs(pred_rgb_256)
 
-            pred_rgb_768 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=True) * 2 - 1
+            pred_rgb_768 = F.interpolate(pred_rgb, (768, 768), mode="bilinear", align_corners=True) * 2 - 1
             latents_768 = self.sd_model2.encode_imgs(pred_rgb_768)
 
         t = torch.randint(self.min_step, self.max_step + 1, (latents_768.shape[0],), dtype=torch.long,
