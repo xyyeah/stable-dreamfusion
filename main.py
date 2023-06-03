@@ -206,10 +206,10 @@ if __name__ == '__main__':
             elif opt.dreamscene:
                 opt.guidance = ['dreamscene']
                 # import pdb; pdb.set_trace()
-                if not opt.dont_override_stuff:
-                    opt.fovy_range = [opt.default_fovy, opt.default_fovy] # fix fov as zero123 doesn't support changing fov
-                    opt.guidance_scale = 3
-                    opt.lambda_3d_normal_smooth = 10
+                # if not opt.dont_override_stuff:
+                #     opt.fovy_range = [opt.default_fovy, opt.default_fovy] # fix fov as zero123 doesn't support changing fov
+                #     opt.guidance_scale = 3
+                #     opt.lambda_3d_normal_smooth = 10
 
         else:
             # use stable-diffusion when providing both text and image
