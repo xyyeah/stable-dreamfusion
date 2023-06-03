@@ -147,11 +147,11 @@ class DreamScene(nn.Module):
         return cs, vs, cadms
 
     def get_text_embeds(self, x):
-        # inputs = self.sd_model.tokenizer(x, padding='max_length', max_length=self.tokenizer.model_max_length,
-        #                                  return_tensors='pt')
-        # embeddings = self.sd_model.text_encoder(inputs.input_ids.to(self.device))[0]
-        # return embeddings
-        return self.sd_model.get_text_embeds(x)
+        inputs = self.sd_model.tokenizer(x, padding='max_length', max_length=self.tokenizer.model_max_length,
+                                         return_tensors='pt')
+        embeddings = self.sd_model.text_encoder(inputs.input_ids.to(self.device))[0]
+        return embeddings
+        # return self.sd_model.get_text_embeds(x)
 
     def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
                    guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
