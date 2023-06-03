@@ -185,7 +185,7 @@ def pose_2_w2c(pose):
     T = - R @ T 
     w2c = torch.zeros_like(pose)
     w2c[:3, :3] = R
-    w2c[:3, 3] = T * 0.5
+    w2c[:3, 3] = T
     w2c[3, 3] = 1
     return w2c
 

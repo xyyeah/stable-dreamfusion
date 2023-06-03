@@ -10,7 +10,7 @@
          --ckpt scratch --batch_size 1 --h 96 --w 96 --fovy_range 20 20 --default_fovy 20 --guidance_scale 7.5 \
          --dont_override_stuff --test_interval 2 \
          --text "a brown teddy bear sitting on a ground" --negative "low quality" \
-         --default_radius 3.2 --radius_range 3.2 3.6
+         --default_radius 1.6
 
 # # # Phase 1
 # python3.9 main.py -O --image /mnt/cache_sail/liulj/stable-dreamfusion/data/teddy_rgba.png \
