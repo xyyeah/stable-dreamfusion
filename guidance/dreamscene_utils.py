@@ -292,8 +292,8 @@ class DreamScene(nn.Module):
         # import pdb; pdb.set_trace()
         # produce latents loop
         latents = torch.randn((1, 4, h // 8, w // 8), device=self.device)
-        self.scheduler.set_timesteps(ddim_steps)
-        recons = self.model.decode_first_stage(embeddings['c_concat'][0])
+        self.sd_model.scheduler.set_timesteps(ddim_steps)
+        recons = self.model.decode_first_stage(embeddings['c_concat'][0]).clamp(-1.0, 1.0)
         text_embeds = self.get_text_embeds(text)
         neg_text_embeds = self.get_text_embeds([""])
 
@@ -309,11 +309,12 @@ class DreamScene(nn.Module):
             )[0]
             model_uncond, model_t = model_output.chunk(2)
             model_output = model_uncond + scale * (model_t - model_uncond)
-            if self.model.parameterization == "v":
-                e_t = self.model.predict_eps_from_z_and_v(latents, t.view(1).to(self.device), model_output)
-            else:
-                e_t = model_output
-            latents = self.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
+            # if self.model.parameterization == "v":
+            #     e_t = self.model.predict_eps_from_z_and_v(latents, t.view(1).to(self.device), model_output)
+            # else:
+            #     e_t = model_output
+            e_t = model_output
+            latents = self.sd_model.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
 
         imgs = self.decode_latents(latents)
         imgs = imgs.cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
