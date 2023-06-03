@@ -205,6 +205,7 @@ if __name__ == '__main__':
 
             elif opt.dreamscene:
                 opt.guidance = ['dreamscene']
+                opt.guidance_scale = 7.5
                 # import pdb; pdb.set_trace()
                 # if not opt.dont_override_stuff:
                 #     opt.fovy_range = [opt.default_fovy, opt.default_fovy] # fix fov as zero123 doesn't support changing fov
