@@ -129,6 +129,7 @@ class DreamScene(nn.Module):
         self.alphas = self.scheduler.alphas_cumprod.to(self.device)  # for convenience
 
         self.sd_model = StableDiffusionUnclip(device, fp16, False)
+        del self.model
         # del self.model.vae.decoder
 
     @torch.no_grad()
