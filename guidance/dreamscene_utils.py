@@ -273,62 +273,63 @@ class DreamScene(nn.Module):
 
         return loss
 
-    @torch.no_grad()
     def __call__(self, image, text,
                  scale=3, ddim_steps=50, ddim_eta=0.0, h=768, w=768,
                  c_crossattn=None, c_concat=None, c_adm=None, post_process=True
                  ):
 
-        if c_crossattn is None:
-            if len(image[0].shape) == 3:
-                image = [img.unsqueeze(0) for img in image]
+        with torch.no_grad():
+            if c_crossattn is None:
+                if len(image[0].shape) == 3:
+                    image = [img.unsqueeze(0) for img in image]
 
-            embeddings = self.get_img_embeds(image)
-            embeddings = {'c_crossattn': embeddings[0],
-                          'c_concat': embeddings[1],
-                          'c_adm': embeddings[2], }
+                embeddings = self.get_img_embeds(image)
+                embeddings = {'c_crossattn': embeddings[0],
+                              'c_concat': embeddings[1],
+                              'c_adm': embeddings[2], }
 
+                # import pdb; pdb.set_trace()
             # import pdb; pdb.set_trace()
-        # import pdb; pdb.set_trace()
-        # produce latents loop
-        latents = torch.randn((1, 4, h // 8, w // 8), device=self.device)
-        self.sd_model.scheduler.set_timesteps(1)
-        recons = self.model.decode_first_stage(embeddings['c_concat'][0]).clamp(-1.0, 1.0)
-        text_embeds = self.get_text_embeds(text)
-        neg_text_embeds = self.get_text_embeds([""])
-        img_embeds = embeddings["c_adm"][0]
+            # produce latents loop
+            latents = torch.randn((1, 4, h // 8, w // 8), device=self.device)
+            self.sd_model.scheduler.set_timesteps(1)
+            recons = self.model.decode_first_stage(embeddings['c_concat'][0]).clamp(-1.0, 1.0)
+            text_embeds = self.get_text_embeds(text)
+            neg_text_embeds = self.get_text_embeds([""])
+            img_embeds = embeddings["c_adm"][0]
 
-        img_embeds = torch.zeros_like(img_embeds)
-        text_embeds = torch.zeros_like(text_embeds)
-        neg_text_embeds = torch.zeros_like(neg_text_embeds)
+            img_embeds = torch.zeros_like(img_embeds)
+            text_embeds = torch.zeros_like(text_embeds)
+            neg_text_embeds = torch.zeros_like(neg_text_embeds)
 
-        for i, t in enumerate(self.sd_model.scheduler.timesteps):
-            print(i)
-            x_in = torch.cat([latents] * 2)
-            t_in = torch.cat([t.view(1)] * 2).to(self.device)
+            for i, t in enumerate(self.sd_model.scheduler.timesteps):
+                print(i)
+                x_in = torch.cat([latents] * 2)
+                t_in = torch.cat([t.view(1)] * 2).to(self.device)
+                x_in = self.sd_model.scheduler.scale_model_input(x_in, t)
 
-            assert not torch.isnan(x_in).any()
-            assert not torch.isnan(t_in).any()
+                assert not torch.isnan(x_in).any()
+                assert not torch.isnan(t_in).any()
 
-            model_output = self.sd_model.unet(
-                x_in, t_in,
-                class_labels=torch.cat([img_embeds, img_embeds], dim=0),
-                encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0)
-            )[0]
-            model_uncond, model_t = model_output.chunk(2)
-            assert not torch.isnan(model_output).any()
-            model_output = model_uncond + scale * (model_t - model_uncond)
-            # if self.model.parameterization == "v":
-            #     e_t = self.model.predict_eps_from_z_and_v(latents, t.view(1).to(self.device), model_output)
-            # else:
-            #     e_t = model_output
-            e_t = model_output
-            latents = self.sd_model.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
+                model_output = self.sd_model.unet(
+                    x_in, t_in,
+                    class_labels=torch.cat([img_embeds, img_embeds], dim=0),
+                    encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0)
+                )[0]
+                model_uncond, model_t = model_output.chunk(2)
+                assert not torch.isnan(model_output).any()
+                model_output = model_uncond + scale * (model_t - model_uncond)
+                # if self.model.parameterization == "v":
+                #     e_t = self.model.predict_eps_from_z_and_v(latents, t.view(1).to(self.device), model_output)
+                # else:
+                #     e_t = model_output
+                e_t = model_output
+                latents = self.sd_model.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
 
-        imgs = self.decode_latents(latents)
-        print(imgs.amax(), imgs.amin(), imgs.mean())
-        imgs = imgs.cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
-        return imgs, recons.cpu().numpy().transpose(0, 2, 3, 1) if post_process else recons
+            imgs = self.decode_latents(latents)
+            print(imgs.amax(), imgs.amin(), imgs.mean())
+            imgs = imgs.cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
+            return imgs, recons.cpu().numpy().transpose(0, 2, 3, 1) if post_process else recons
 
     # verification
     # @torch.no_grad()
