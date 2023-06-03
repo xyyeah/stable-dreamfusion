@@ -166,52 +166,20 @@ class DreamScene(nn.Module):
         if as_latent:
             latents = F.interpolate(pred_rgb, (32, 32), mode="bilinear", align_corners=True) * 2 - 1
         else:
-            pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=True) * 2 - 1
-            latents = self.encode_imgs(pred_rgb_256)
 
             pred_rgb_768 = F.interpolate(pred_rgb, (768, 768), mode="bilinear", align_corners=True) * 2 - 1
             latents_768 = self.encode_imgs(pred_rgb_768)
 
-        t = torch.randint(self.min_step, self.max_step + 1, (latents.shape[0],), dtype=torch.long, device=self.device)
+        t = torch.randint(self.min_step, self.max_step + 1, (latents_768.shape[0],), dtype=torch.long,
+                          device=self.device)
 
         # q sample
         with torch.no_grad():
-            noise = torch.randn_like(latents)
-            latents_noisy = self.scheduler.add_noise(latents, noise, t)
-            x_in = torch.cat([latents_noisy] * 2)
+            noise = torch.randn_like(latents_768)
             t_in = torch.cat([t] * 2).to(self.device)
 
-            noise_preds = []
             noise_preds_sd = []
             num_imgs = len(embeddings["c_crossattn"])
-            for idx in range(num_imgs):
-
-                c_crossattn, c_concat, c_adm = embeddings["c_crossattn"][idx], embeddings["c_concat"][idx], \
-                                               embeddings["c_adm"][idx]
-                cond = {"c_crossattn": [c_crossattn], "c_concat": [c_concat], "c_adm": c_adm, "pose": pose,
-                        "intrinsic": intrinsic, "dist": dist.view(1)}
-                uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)],
-                          "c_concat": [c_concat], 'c_adm': torch.zeros_like(c_adm),
-                          "pose": pose, "intrinsic": intrinsic, "dist": dist.view(1)}
-                c_in = dict()
-                for k in cond:
-                    if isinstance(cond[k], list):
-                        c_in[k] = [torch.cat([uncond[k][i], cond[k][i]]) for i in range(len(cond[k]))]
-                    elif isinstance(cond[k], torch.Tensor):
-                        c_in[k] = torch.cat([uncond[k], cond[k]])
-                    else:
-                        c_in[k] = cond[k]
-
-            # import pdb; pdb.set_trace()
-            model_output, render_rgb = self.model.apply_model(x_in, t_in, c_in, return_rgb=True)
-            model_uncond, model_t = model_output.chunk(2)
-
-            render_rgb = render_rgb.chunk(2)[1]
-            model_output = model_uncond + guidance_scale * (model_t - model_uncond)
-            if self.model.parameterization == "v":
-                e_t = self.model.predict_eps_from_z_and_v(latents_noisy, t, model_output)
-            else:
-                e_t = model_output
 
             noise_768 = torch.randn_like(latents_768)
             latents_noisy_768 = self.scheduler.add_noise(latents_768, noise_768, t)
@@ -239,9 +207,7 @@ class DreamScene(nn.Module):
             else:
                 e_t_sd = model_output_sd
 
-            noise_preds.append(e_t)
             noise_preds_sd.append(e_t_sd)
-        noise_pred = torch.stack(noise_preds).sum(dim=0) / len(noise_preds)
         noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
         w = (1 - self.alphas[t])
@@ -254,30 +220,149 @@ class DreamScene(nn.Module):
         # grad2 = torch.nan_to_num(grad2)
 
         if save_guidance_path:
-            with torch.no_grad():
-                pred_rgb_256 = torch.clamp((pred_rgb_256 + 1.0) / 2.0, min=0.0, max=1.0)
-
-            # visualize predicted denoised image
-            result_hopefully_less_noisy_image = self.decode_latents(
-                self.model.predict_start_from_noise(latents_noisy, t, noise_pred))
+            pred_rgb_768 = torch.clamp((pred_rgb_768 + 1.0) / 2.0, min=0.0, max=1.0)
             result_hopefully_less_noisy_image2 = self.decode_latents(
                 self.model.predict_start_from_noise(latents_noisy_768, t, noise_pred_sd))
-            result_hopefully_less_noisy_image2 = \
-                F.interpolate(result_hopefully_less_noisy_image2, (256, 256), mode="bilinear", align_corners=True)
             # visualize noisier image
-            result_noisier_image = self.decode_latents(latents_noisy)
+            result_noisier_image = self.decode_latents(latents_noisy_768)
 
-            rendered_imgs = self.decode_latents(render_rgb)
             # all 3 input images are [1, 3, H, W], e.g. [1, 3, 512, 512]
             viz_images = torch.cat(
-                [pred_rgb_256, result_noisier_image, result_hopefully_less_noisy_image,
-                 result_hopefully_less_noisy_image2, rendered_imgs], dim=-1)
+                [pred_rgb_768, result_noisier_image,
+                 result_hopefully_less_noisy_image2], dim=-1)
             save_image(viz_images, save_guidance_path)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
         loss = SpecifyGradient.apply(latents_768, grad)  # + SpecifyGradient.apply(latents_768, grad2)
 
         return loss  # + 2.0 * F.mse_loss(render_rgb, latents)
+
+    # def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
+    #                guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
+    #     # pred_rgb: tensor [1, 3, H, W] in [0, 1]
+    #     # adjust SDS scale based on how far the novel view is from the known view
+    #
+    #     n_pose = pose.size(1)
+    #     if n_pose > 1:
+    #         intrinsic = intrinsic.repeat(n_pose, 1)
+    #         dist = dist.view(1).repeat(n_pose)
+    #     pose = torch.cat(pose.unbind(dim=1), dim=0)
+    #
+    #     if as_latent:
+    #         latents = F.interpolate(pred_rgb, (32, 32), mode="bilinear", align_corners=True) * 2 - 1
+    #     else:
+    #         pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=True) * 2 - 1
+    #         latents = self.encode_imgs(pred_rgb_256)
+    #
+    #         pred_rgb_768 = F.interpolate(pred_rgb, (768, 768), mode="bilinear", align_corners=True) * 2 - 1
+    #         latents_768 = self.encode_imgs(pred_rgb_768)
+    #
+    #     t = torch.randint(self.min_step, self.max_step + 1, (latents.shape[0],), dtype=torch.long, device=self.device)
+    #
+    #     # q sample
+    #     with torch.no_grad():
+    #         noise = torch.randn_like(latents)
+    #         latents_noisy = self.scheduler.add_noise(latents, noise, t)
+    #         x_in = torch.cat([latents_noisy] * 2)
+    #         t_in = torch.cat([t] * 2).to(self.device)
+    #
+    #         noise_preds = []
+    #         noise_preds_sd = []
+    #         num_imgs = len(embeddings["c_crossattn"])
+    #         for idx in range(num_imgs):
+    #
+    #             c_crossattn, c_concat, c_adm = embeddings["c_crossattn"][idx], embeddings["c_concat"][idx], \
+    #                                            embeddings["c_adm"][idx]
+    #             cond = {"c_crossattn": [c_crossattn], "c_concat": [c_concat], "c_adm": c_adm, "pose": pose,
+    #                     "intrinsic": intrinsic, "dist": dist.view(1)}
+    #             uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)],
+    #                       "c_concat": [c_concat], 'c_adm': torch.zeros_like(c_adm),
+    #                       "pose": pose, "intrinsic": intrinsic, "dist": dist.view(1)}
+    #             c_in = dict()
+    #             for k in cond:
+    #                 if isinstance(cond[k], list):
+    #                     c_in[k] = [torch.cat([uncond[k][i], cond[k][i]]) for i in range(len(cond[k]))]
+    #                 elif isinstance(cond[k], torch.Tensor):
+    #                     c_in[k] = torch.cat([uncond[k], cond[k]])
+    #                 else:
+    #                     c_in[k] = cond[k]
+    #
+    #         # import pdb; pdb.set_trace()
+    #         model_output, render_rgb = self.model.apply_model(x_in, t_in, c_in, return_rgb=True)
+    #         model_uncond, model_t = model_output.chunk(2)
+    #
+    #         render_rgb = render_rgb.chunk(2)[1]
+    #         model_output = model_uncond + guidance_scale * (model_t - model_uncond)
+    #         if self.model.parameterization == "v":
+    #             e_t = self.model.predict_eps_from_z_and_v(latents_noisy, t, model_output)
+    #         else:
+    #             e_t = model_output
+    #
+    #         noise_768 = torch.randn_like(latents_768)
+    #         latents_noisy_768 = self.scheduler.add_noise(latents_768, noise_768, t)
+    #         x_in = torch.cat([latents_noisy_768] * 2)
+    #
+    #         img_embeds = embeddings["c_adm"][0]
+    #         text_embeds = embeddings['prompt_embeds']
+    #         neg_text_embeds = embeddings['neg_prompt_embeds']
+    #         cond = {"c_crossattn": [text_embeds], "c_adm": img_embeds}
+    #         uncond = {"c_crossattn": [neg_text_embeds], 'c_adm': torch.zeros_like(img_embeds)}
+    #         c_in = dict()
+    #         for k in cond:
+    #             if isinstance(cond[k], list):
+    #                 c_in[k] = [torch.cat([uncond[k][i], cond[k][i]]) for i in range(len(cond[k]))]
+    #             elif isinstance(cond[k], torch.Tensor):
+    #                 c_in[k] = torch.cat([uncond[k], cond[k]])
+    #             else:
+    #                 c_in[k] = cond[k]
+    #
+    #         model_output_sd = self.sd_model.model.apply_model(x_in, t_in, c_in)
+    #         model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
+    #         model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
+    #         if self.model.parameterization == "v":
+    #             e_t_sd = self.model.predict_eps_from_z_and_v(latents_noisy_768, t, model_output_sd)
+    #         else:
+    #             e_t_sd = model_output_sd
+    #
+    #         noise_preds.append(e_t)
+    #         noise_preds_sd.append(e_t_sd)
+    #     noise_pred = torch.stack(noise_preds).sum(dim=0) / len(noise_preds)
+    #     noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
+    #
+    #     w = (1 - self.alphas[t])
+    #     # grad = (grad_scale * w)[:, None, None, None] * (noise_pred - noise)
+    #     # grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_pred)
+    #     # grad = (grad_scale * w)[:, None, None, None] * (-noise_pred)
+    #     # grad2 = (grad_scale * w)[:, None, None, None] * noise_pred_sd
+    #     grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_768)
+    #     grad = torch.nan_to_num(grad)
+    #     # grad2 = torch.nan_to_num(grad2)
+    #
+    #     if save_guidance_path:
+    #         with torch.no_grad():
+    #             pred_rgb_256 = torch.clamp((pred_rgb_256 + 1.0) / 2.0, min=0.0, max=1.0)
+    #
+    #         # visualize predicted denoised image
+    #         result_hopefully_less_noisy_image = self.decode_latents(
+    #             self.model.predict_start_from_noise(latents_noisy, t, noise_pred))
+    #         result_hopefully_less_noisy_image2 = self.decode_latents(
+    #             self.model.predict_start_from_noise(latents_noisy_768, t, noise_pred_sd))
+    #         result_hopefully_less_noisy_image2 = \
+    #             F.interpolate(result_hopefully_less_noisy_image2, (256, 256), mode="bilinear", align_corners=True)
+    #         # visualize noisier image
+    #         result_noisier_image = self.decode_latents(latents_noisy)
+    #
+    #         rendered_imgs = self.decode_latents(render_rgb)
+    #         # all 3 input images are [1, 3, H, W], e.g. [1, 3, 512, 512]
+    #         viz_images = torch.cat(
+    #             [pred_rgb_256, result_noisier_image, result_hopefully_less_noisy_image,
+    #              result_hopefully_less_noisy_image2, rendered_imgs], dim=-1)
+    #         save_image(viz_images, save_guidance_path)
+    #
+    #     # since we omitted an item in grad, we need to use the custom function to specify the gradient
+    #     loss = SpecifyGradient.apply(latents_768, grad)  # + SpecifyGradient.apply(latents_768, grad2)
+    #
+    #     return loss  # + 2.0 * F.mse_loss(render_rgb, latents)
 
     def __call__(self, image, text,
                  scale=3, ddim_steps=50, ddim_eta=0.0, h=768, w=768,
