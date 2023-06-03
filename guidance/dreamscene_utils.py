@@ -292,12 +292,11 @@ class DreamScene(nn.Module):
         # import pdb; pdb.set_trace()
         # produce latents loop
         latents = torch.randn((1, 4, h // 8, w // 8), device=self.device)
-        self.sd_model.scheduler.set_timesteps(ddim_steps)
+        self.sd_model.scheduler.set_timesteps(1)
         recons = self.model.decode_first_stage(embeddings['c_concat'][0]).clamp(-1.0, 1.0)
         text_embeds = self.get_text_embeds(text)
         neg_text_embeds = self.get_text_embeds([""])
         img_embeds = embeddings["c_adm"][0]
-        img_embeds = torch.zeros_like(img_embeds)
 
         for i, t in enumerate(self.sd_model.scheduler.timesteps):
             print(i)
