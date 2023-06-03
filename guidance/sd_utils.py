@@ -100,51 +100,6 @@ class StableDiffusion(nn.Module):
 
         return embeddings
 
-    def get_score(self, text_embeddings, pred_rgb, guidance_scale=100, as_latent=False, grad_scale=1,
-                  save_guidance_path: Path = None):
-        if as_latent:
-            latents = F.interpolate(pred_rgb, (64, 64), mode='bilinear', align_corners=False) * 2 - 1
-        else:
-            # interp to 512x512 to be fed into vae.
-            pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode='bilinear', align_corners=False)
-            # encode image into latents with vae, requires grad!
-            latents = self.encode_imgs(pred_rgb_512)
-
-        # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
-        t = torch.randint(self.min_step, self.max_step + 1, (latents.shape[0],), dtype=torch.long, device=self.device)
-
-        # predict the noise residual with unet, NO grad!
-        with torch.no_grad():
-            # add noise
-            noise = torch.randn_like(latents)
-            latents_noisy = self.scheduler.add_noise(latents, noise, t)
-            # pred noise
-            latent_model_input = torch.cat([latents_noisy] * 2)
-            tt = torch.cat([t] * 2)
-            noise_pred = self.unet(latent_model_input, tt, encoder_hidden_states=text_embeddings).sample
-
-            # perform guidance (high scale from paper!)
-            noise_pred_uncond, noise_pred_pos = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_pos - noise_pred_uncond)
-
-        # import kiui
-        # latents_tmp = torch.randn((1, 4, 64, 64), device=self.device)
-        # latents_tmp = latents_tmp.detach()
-        # kiui.lo(latents_tmp)
-        # self.scheduler.set_timesteps(30)
-        # for i, t in enumerate(self.scheduler.timesteps):
-        #     latent_model_input = torch.cat([latents_tmp] * 3)
-        #     noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings)['sample']
-        #     noise_pred_uncond, noise_pred_pos = noise_pred.chunk(2)
-        #     noise_pred = noise_pred_uncond + 10 * (noise_pred_pos - noise_pred_uncond)
-        #     latents_tmp = self.scheduler.step(noise_pred, t, latents_tmp)['prev_sample']
-        # imgs = self.decode_latents(latents_tmp)
-        # kiui.vis.plot_image(imgs)
-
-        # w(t), sigma_t^2
-        # w = (1 - self.alphas[t])
-        return noise_pred
-
     def train_step(self, text_embeddings, pred_rgb, guidance_scale=100, as_latent=False, grad_scale=1,
                    save_guidance_path: Path = None):
 
@@ -190,8 +145,8 @@ class StableDiffusion(nn.Module):
 
         # w(t), sigma_t^2
         w = (1 - self.alphas[t])
-        # grad = grad_scale * w[:, None, None, None] * (noise_pred - noise)
-        grad = grad_scale * w[:, None, None, None] * noise_pred
+        grad = grad_scale * w[:, None, None, None] * (noise_pred - noise)
+        # grad = grad_scale * w[:, None, None, None] * noise_pred
         grad = torch.nan_to_num(grad)
 
         if save_guidance_path:
