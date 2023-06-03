@@ -312,8 +312,8 @@ class DreamScene(nn.Module):
             else:
                 print(k, v)
         uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)],
-                  "c_concat": [torch.zeros_like(c_concat[0])],
-                  'c_adm': torch.zeros_like(c_adm[0]), "pose": pose, "intrinsic": instrinsic, "dist": dist.view(1)}
+                  "c_concat": c_concat,
+                  'c_adm': c_adm[0], "pose": pose, "intrinsic": instrinsic, "dist": dist.view(1)}
 
         # produce latents loop
         latents = torch.randn((1, 4, h // 8, w // 8), device=self.device)
