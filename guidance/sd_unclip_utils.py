@@ -67,7 +67,7 @@ class StableDiffusionUnclip(nn.Module):
         # self.scheduler = DDIMScheduler.from_pretrained("stabilityai/stable-diffusion-2-1-unclip-small",
         #                                                subfolder="scheduler", torch_dtype=self.precision_t,
         #                                                cache_dir="./cache_dir")
-        self.scheduler = self.pipe.scheduler
+        self.scheduler = pipe.scheduler
         del pipe
         del self.vae
 
