@@ -496,7 +496,7 @@ if __name__ == "__main__":
     print(f'[INFO] loading model ...')
     model = DreamScene(device, opt.fp16)
 
-    outputs = model([image, ["teddy bear"]], pose=relative_poses, instrinsic=intrinsic, dist=source_dist)
+    outputs = model([image, ["teddy bear"]], pose=None, instrinsic=None, dist=None)
     images, recons = outputs
     os.makedirs("debug_res", exist_ok=True)
     for idx in range(images.shape[0]):
