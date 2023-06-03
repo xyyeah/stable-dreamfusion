@@ -157,6 +157,10 @@ class DreamScene(nn.Module):
                    guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
         # pred_rgb: tensor [1, 3, H, W] in [0, 1]
         # adjust SDS scale based on how far the novel view is from the known view
+        return self.sd_model.train_step(
+            torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0),
+            pred_rgb
+        )
 
         n_pose = pose.size(1)
         if n_pose > 1:
