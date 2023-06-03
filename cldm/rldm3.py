@@ -132,7 +132,7 @@ class ControlLDM(LatentDiffusion):
         # imgs: image tensor [B, h, w, c] 
         # import pdb; pdb.set_trace()
 
-        batch = {self.first_stage_key: torch.zeros_like(imgs), self.control_key: imgs,
+        batch = {self.first_stage_key: imgs, self.control_key: imgs,
                  self.cond_stage_key: ["a photo of object"]}
         x, c = super().get_input(batch, self.first_stage_key)
         control = batch[self.control_key]

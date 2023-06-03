@@ -210,7 +210,7 @@ class DreamScene(nn.Module):
                 e_t = model_output
 
             noise_768 = torch.randn_like(latents_768)
-            latents_noisy_768 = self.scheduler.add_noise(latents_768, noise_768, t)
+            latents_noisy_768 = self.sd_model.add_noise(latents_768, noise_768, t)
             x_in = torch.cat([latents_noisy_768] * 2)
 
             img_embeds = embeddings["c_adm"][0]
@@ -218,7 +218,7 @@ class DreamScene(nn.Module):
             neg_text_embeds = embeddings['neg_prompt_embeds']
             model_output_sd = self.sd_model.unet(
                 x_in, t_in,
-                class_labels=torch.cat([torch.zeros_like(img_embeds), img_embeds], dim=0),
+                class_labels=torch.cat([img_embeds, img_embeds], dim=0),
                 encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0)
             )[0]
             model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
