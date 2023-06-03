@@ -148,7 +148,7 @@ class DreamScene(nn.Module):
         return cs, vs, cadms
 
     def get_text_embeds(self, x):
-        return self.sd_model2.get_text_embeds(x) #  .get_learned_conditioning(x)
+        return self.sd_model2.get_text_embeds(x)
         # inputs = self.sd_model.tokenizer(x, padding='max_length', max_length=self.tokenizer.model_max_length,
         #                                  return_tensors='pt')
         # embeddings = self.sd_model.text_encoder(inputs.input_ids.to(self.device))[0]
