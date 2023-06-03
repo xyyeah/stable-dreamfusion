@@ -623,6 +623,7 @@ class Trainer(object):
                         end_z = self.embeddings['SD']['back']
                     text_z.append(r * start_z + (1 - r) * end_z)
                 text_z = torch.cat(text_z, dim=0)
+                text_z = torch.cat([self.embeddings['SD']['uncond'], self.embeddings['SD']['default']], dim=0)
 
                 loss = loss + self.guidance['SD'].train_step(text_z, pred_rgb, as_latent=as_latent,
                                                              guidance_scale=self.opt.guidance_scale,
