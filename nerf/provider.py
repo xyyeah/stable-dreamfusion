@@ -184,6 +184,7 @@ def circle_poses(device, radius=torch.tensor([3.2]), theta=torch.tensor([60]), p
 
 
 def pose_2_w2c(pose):
+    return pose
     R, T = pose[:3, :3], pose[:3, 3]
     R = R.T
     T = - R @ T

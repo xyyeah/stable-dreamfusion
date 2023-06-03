@@ -7,7 +7,7 @@
  python3.9 main.py -O --image ./data/teddy_rgba.png \
          --workspace /workspace/teddy_vsd --iters 10000 --dreamscene --posefile "" \
          --save_guidance --save_guidance_interval 50 \
-         --ckpt scratch --batch_size 1 --h 96 --w 96 --fovy_range 10 30 --default_fovy 20 --guidance_scale 7.5 \
+         --ckpt scratch --batch_size 1 --h 96 --w 96 --fovy_range 10 30 --default_fovy 20 --guidance_scale 100.0 \
          --dont_override_stuff --test_interval 2 \
          --text "a brown teddy bear sitting on a ground" --negative "low quality" \
          --lambda_2d_normal_smooth 0.0 --lambda_depth 1.0 --lambda_rgb 1.0  --lambda_mask 1.0 \
