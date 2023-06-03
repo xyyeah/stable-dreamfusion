@@ -187,7 +187,7 @@ class DreamScene(nn.Module):
                 cond = {"c_crossattn": [c_crossattn], "c_concat": [c_concat], "c_adm": c_adm, "pose": pose,
                         "intrinsic": intrinsic, "dist": dist.view(1)}
                 uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)],
-                          "c_concat": [torch.zeros_like(c_concat)], 'c_adm': torch.zeros_like(c_adm),
+                          "c_concat": [c_concat], 'c_adm': torch.zeros_like(c_adm),
                           "pose": pose, "intrinsic": intrinsic, "dist": dist.view(1)}
                 c_in = dict()
                 for k in cond:
@@ -210,7 +210,7 @@ class DreamScene(nn.Module):
                 e_t = model_output
 
             noise_768 = torch.randn_like(latents_768)
-            latents_noisy_768 = self.sd_model.add_noise(latents_768, noise_768, t)
+            latents_noisy_768 = self.scheduler.add_noise(latents_768, noise_768, t)
             x_in = torch.cat([latents_noisy_768] * 2)
 
             img_embeds = embeddings["c_adm"][0]
