@@ -225,7 +225,7 @@ class DreamScene(nn.Module):
         noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
         w = (1 - self.alphas[t])
-        grad = (grad_scale * w)[:, None, None, None] * latents_noisy_768
+        grad = (grad_scale * w)[:, None, None, None] * noise_pred_sd
         grad = torch.nan_to_num(grad)
 
         if save_guidance_path:
