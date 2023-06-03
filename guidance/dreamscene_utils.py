@@ -156,10 +156,10 @@ class DreamScene(nn.Module):
         # return self.model.get_text_embeds(x)
 
     def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
-                   guidance_scale=100.0, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
+                   guidance_scale=3.0, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
         # pred_rgb: tensor [1, 3, H, W] in [0, 1]
         # adjust SDS scale based on how far the novel view is from the known view
-        loss1, t, noise = self.sd_model2.train_step(
+        loss1 = self.sd_model2.train_step(
             torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0),
             pred_rgb,
             guidance_scale,
