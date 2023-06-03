@@ -306,7 +306,7 @@ class DreamScene(nn.Module):
                 x_in, t_in,
                 class_labels=torch.cat([img_embeds, img_embeds], dim=0),
                 encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0)
-            )
+            )[0]
             model_uncond, model_t = model_output.chunk(2)
             model_output = model_uncond + scale * (model_t - model_uncond)
             if self.model.parameterization == "v":
