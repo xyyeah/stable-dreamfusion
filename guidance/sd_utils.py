@@ -141,6 +141,7 @@ class StableDiffusion(nn.Module):
         # w(t), sigma_t^2
         w = (1 - self.alphas[t])
         grad = grad_scale * w[:, None, None, None] * (noise_pred - noise)
+        grad = grad_scale * w[:, None, None, None] * noise_pred
         grad = torch.nan_to_num(grad)
 
         if save_guidance_path:
@@ -173,7 +174,7 @@ class StableDiffusion(nn.Module):
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
         loss = SpecifyGradient.apply(latents, grad)
 
-        return loss
+        return loss, t
 
     @torch.no_grad()
     def produce_latents(self, text_embeddings, height=512, width=512, num_inference_steps=50, guidance_scale=7.5, latents=None):
