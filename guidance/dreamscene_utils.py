@@ -292,7 +292,7 @@ class DreamScene(nn.Module):
             # import pdb; pdb.set_trace()
             # produce latents loop
             latents = torch.randn((1, 4, h // 8, w // 8), device=self.device)
-            self.sd_model.scheduler.set_timesteps(1)
+            self.scheduler.set_timesteps(20)
             recons = self.model.decode_first_stage(embeddings['c_concat'][0]).clamp(-1.0, 1.0)
             text_embeds = self.get_text_embeds(text)
             neg_text_embeds = self.get_text_embeds([""])
@@ -302,19 +302,27 @@ class DreamScene(nn.Module):
             text_embeds = torch.zeros_like(text_embeds)
             neg_text_embeds = torch.zeros_like(neg_text_embeds)
 
-            for i, t in enumerate(self.sd_model.scheduler.timesteps):
-                print(i)
+            for i, t in enumerate(self.scheduler.timesteps):
+                print(i, t)
                 x_in = torch.cat([latents] * 2)
                 t_in = torch.cat([t.view(1)] * 2).to(self.device)
-                x_in = self.sd_model.scheduler.scale_model_input(x_in, t)
 
                 assert not torch.isnan(x_in).any()
                 assert not torch.isnan(t_in).any()
 
-                model_output = self.sd_model.unet(
-                    x_in, t_in,
-                    class_labels=torch.cat([img_embeds, img_embeds], dim=0),
-                    encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0)
+                cond = {"c_crossattn": [text_embeds], "c_adm": img_embeds}
+                uncond = {"c_crossattn": [neg_text_embeds], 'c_adm': img_embeds}
+                c_in = dict()
+                for k in cond:
+                    if isinstance(cond[k], list):
+                        c_in[k] = [torch.cat([uncond[k][i], cond[k][i]]) for i in range(len(cond[k]))]
+                    elif isinstance(cond[k], torch.Tensor):
+                        c_in[k] = torch.cat([uncond[k], cond[k]])
+                    else:
+                        c_in[k] = cond[k]
+
+                model_output = self.sd_model.model(
+                    x_in, t_in, c_in
                 )[0]
                 model_uncond, model_t = model_output.chunk(2)
                 assert not torch.isnan(model_output).any()
@@ -324,7 +332,7 @@ class DreamScene(nn.Module):
                 # else:
                 #     e_t = model_output
                 e_t = model_output
-                latents = self.sd_model.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
+                latents = self.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
 
             imgs = self.decode_latents(latents)
             print(imgs.amax(), imgs.amin(), imgs.mean())
@@ -450,6 +458,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from PIL import Image
     import json
+
     #
     parser = argparse.ArgumentParser()
     # parser.add_argument('input', type=str, default="/mnt/cache_sail/views_release/4a03d2eceba847ea897f0944e8a57ab3/010.png")
