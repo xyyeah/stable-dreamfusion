@@ -293,7 +293,7 @@ class DreamScene(nn.Module):
         # produce latents loop
         latents = torch.randn((1, 4, h // 8, w // 8), device=self.device)
         self.scheduler.set_timesteps(ddim_steps)
-        recons = self.model.decode_first_stage(embeddings[1][0])
+        recons = self.model.decode_first_stage(embeddings['c_concat'][0])
         text_embeds = self.get_text_embeds(text)
         neg_text_embeds = self.get_text_embeds([""])
 
