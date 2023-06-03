@@ -307,6 +307,9 @@ class DreamScene(nn.Module):
             x_in = torch.cat([latents] * 2)
             t_in = torch.cat([t.view(1)] * 2).to(self.device)
 
+            assert not torch.isnan(x_in).any()
+            assert not torch.isnan(t_in).any()
+
             model_output = self.sd_model.unet(
                 x_in, t_in,
                 class_labels=torch.cat([img_embeds, img_embeds], dim=0),
