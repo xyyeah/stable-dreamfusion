@@ -188,7 +188,7 @@ class DreamScene(nn.Module):
             x_in = torch.cat([latents_noisy_768] * 2)
 
             text_embeddings = torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0)
-            model_output_sd = self.unet(x_in, t_in, encoder_hidden_states=text_embeddings).sample
+            model_output_sd = self.sd_model.unet(x_in, t_in, encoder_hidden_states=text_embeddings).sample
 
             # img_embeds = embeddings["c_adm"][0]
             # text_embeds = embeddings['prompt_embeds']
