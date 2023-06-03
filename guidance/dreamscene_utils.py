@@ -298,9 +298,9 @@ class DreamScene(nn.Module):
             neg_text_embeds = self.get_text_embeds([""])
             img_embeds = embeddings["c_adm"][0]
 
-            img_embeds = torch.zeros_like(img_embeds)
-            text_embeds = torch.zeros_like(text_embeds)
-            neg_text_embeds = torch.zeros_like(neg_text_embeds)
+            # img_embeds = torch.zeros_like(img_embeds)
+            # text_embeds = torch.zeros_like(text_embeds)
+            # neg_text_embeds = torch.zeros_like(neg_text_embeds)
 
             for i, t in enumerate(self.scheduler.timesteps):
                 t_int = t
@@ -313,7 +313,7 @@ class DreamScene(nn.Module):
                 assert not torch.isnan(t_in).any()
 
                 cond = {"c_crossattn": [text_embeds], "c_adm": img_embeds}
-                uncond = {"c_crossattn": [neg_text_embeds], 'c_adm': img_embeds}
+                uncond = {"c_crossattn": [neg_text_embeds], 'c_adm': torch.zeros_like(img_embeds)}
                 c_in = dict()
                 for k in cond:
                     if isinstance(cond[k], list):
