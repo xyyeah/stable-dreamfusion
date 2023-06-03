@@ -64,10 +64,10 @@ class StableDiffusionUnclip(nn.Module):
         self.text_encoder = pipe.text_encoder
         self.unet = pipe.unet
 
-        self.scheduler = DDIMScheduler.from_pretrained("stabilityai/stable-diffusion-2-1-unclip-small",
-                                                       subfolder="scheduler", torch_dtype=self.precision_t,
-                                                       cache_dir="./cache_dir")
-
+        # self.scheduler = DDIMScheduler.from_pretrained("stabilityai/stable-diffusion-2-1-unclip-small",
+        #                                                subfolder="scheduler", torch_dtype=self.precision_t,
+        #                                                cache_dir="./cache_dir")
+        self.scheduler = self.pipe.scheduler
         del pipe
         del self.vae
 
