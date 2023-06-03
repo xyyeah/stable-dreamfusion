@@ -298,6 +298,7 @@ class DreamScene(nn.Module):
         neg_text_embeds = self.get_text_embeds([""])
         img_embeds = embeddings["c_adm"][0]
 
+
         for i, t in enumerate(self.sd_model.scheduler.timesteps):
             print(i)
             x_in = torch.cat([latents] * 2)
@@ -318,6 +319,7 @@ class DreamScene(nn.Module):
             latents = self.sd_model.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
 
         imgs = self.decode_latents(latents)
+        print(imgs.amax(), imgs.amin(), imgs.mean())
         imgs = imgs.cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
         return imgs, recons.cpu().numpy().transpose(0, 2, 3, 1) if post_process else recons
 
