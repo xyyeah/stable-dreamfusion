@@ -297,7 +297,8 @@ class DreamScene(nn.Module):
         text_embeds = self.get_text_embeds(text)
         neg_text_embeds = self.get_text_embeds([""])
 
-        for i, t in enumerate(self.scheduler.timesteps):
+        for i, t in enumerate(self.sd_model.scheduler.timesteps):
+            print(i)
             x_in = torch.cat([latents] * 2)
             t_in = torch.cat([t.view(1)] * 2).to(self.device)
 
