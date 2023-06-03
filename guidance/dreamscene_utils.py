@@ -176,7 +176,7 @@ class DreamScene(nn.Module):
         if as_latent:
             latents = F.interpolate(pred_rgb, (32, 32), mode="bilinear", align_corners=True) * 2 - 1
         else:
-            pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=True) * 2 - 1
+            pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode='bilinear', align_corners=False) * 2 - 1
             latents_768 = self.encode_imgs(pred_rgb_256)
 
         # t = torch.randint(self.min_step, self.max_step + 1, (latents_768.shape[0],), dtype=torch.long,
@@ -226,7 +226,7 @@ class DreamScene(nn.Module):
         noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
         w = (1 - self.alphas[t])
-        grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_768)
+        grad = (grad_scale * w)[:, None, None, None] * noise_pred_sd
         grad = torch.nan_to_num(grad)
 
         if save_guidance_path:
@@ -247,8 +247,7 @@ class DreamScene(nn.Module):
             save_image(viz_images, save_guidance_path)
 
         loss = SpecifyGradient.apply(latents_768, grad)
-        print(loss1, loss)
-        return loss1 + 0.1 * loss
+        return loss1 - loss
 
     # def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
     #                guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
