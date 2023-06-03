@@ -159,7 +159,7 @@ class DreamScene(nn.Module):
                    guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
         # pred_rgb: tensor [1, 3, H, W] in [0, 1]
         # adjust SDS scale based on how far the novel view is from the known view
-        return self.sd_model2.train_step(
+        loss1 = self.sd_model2.train_step(
             torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0),
             pred_rgb,
             guidance_scale,
@@ -237,13 +237,14 @@ class DreamScene(nn.Module):
             # all 3 input images are [1, 3, H, W], e.g. [1, 3, 512, 512]
             viz_images = torch.cat(
                 [pred_rgb_256, result_noisier_image,
-                 result_hopefully_less_noisy_image2, rendered_imgs], dim=-1)
+                 result_hopefully_less_noisy_image2, rendered_imgs
+            ], dim=-1)
             save_image(viz_images, save_guidance_path)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
         loss = SpecifyGradient.apply(latents_768, grad)  # + SpecifyGradient.apply(latents_768, grad2)
 
-        return loss
+        return loss1 - loss
 
     # def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
     #                guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
