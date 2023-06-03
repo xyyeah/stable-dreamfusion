@@ -185,7 +185,7 @@ def pose_2_w2c(pose):
     T = - R @ T 
     w2c = torch.zeros_like(pose)
     w2c[:3, :3] = R
-    w2c[:3, 3] = T
+    w2c[:3, 3] = T * 0.5
     w2c[3, 3] = 1
     return w2c
 
@@ -341,8 +341,7 @@ class NeRFPoseDataset:
 
         relative_pose = [cond_rt @ torch.linalg.inv(w2c[idx]) for idx in range(len(w2c))]
         # print(f"relative_pose: \n{relative_pose}")
-        source_dist = torch.norm(cond_rt[:3, 3], p=2) * 0.5
-        # source_dist = torch.tensor(1.6).float()
+        source_dist = torch.norm(cond_rt[:3, 3], p=2)
 
         data = {
             'H': self.H,
