@@ -16,13 +16,14 @@ from torch.utils.data import DataLoader
 from .utils import get_rays, safe_normalize
 
 DIR_COLORS = np.array([
-    [255, 0, 0, 255], # front
-    [0, 255, 0, 255], # side
-    [0, 0, 255, 255], # back
-    [255, 255, 0, 255], # side
-    [255, 0, 255, 255], # overhead
-    [0, 255, 255, 255], # bottom
+    [255, 0, 0, 255],  # front
+    [0, 255, 0, 255],  # side
+    [0, 0, 255, 255],  # back
+    [255, 255, 0, 255],  # side
+    [255, 0, 255, 255],  # overhead
+    [0, 255, 255, 255],  # bottom
 ], dtype=np.uint8)
+
 
 def visualize_poses(poses, dirs, size=0.1):
     # poses: [B, 4, 4], dirs: [B]
@@ -49,6 +50,7 @@ def visualize_poses(poses, dirs, size=0.1):
 
     trimesh.Scene(objects).show()
 
+
 def get_view_direction(thetas, phis, overhead, front):
     #                   phis: [B,];          thetas: [B,]
     # front = 0             [-front/2, front/2)
@@ -70,7 +72,8 @@ def get_view_direction(thetas, phis, overhead, front):
     return res
 
 
-def rand_poses(size, device, opt, radius_range=[1, 1.5], theta_range=[0, 120], phi_range=[0, 360], return_dirs=False, angle_overhead=30, angle_front=60, uniform_sphere_rate=0.5):
+def rand_poses(size, device, opt, radius_range=[1, 1.5], theta_range=[0, 120], phi_range=[0, 360], return_dirs=False,
+               angle_overhead=30, angle_front=60, uniform_sphere_rate=0.5):
     ''' generate random poses from an orbit camera
     Args:
         size: batch size of generated poses.
@@ -97,8 +100,8 @@ def rand_poses(size, device, opt, radius_range=[1, 1.5], theta_range=[0, 120], p
                 torch.randn(size, device=device),
             ], dim=-1), p=2, dim=1
         )
-        thetas = torch.acos(unit_centers[:,1])
-        phis = torch.atan2(unit_centers[:,0], unit_centers[:,2])
+        thetas = torch.acos(unit_centers[:, 1])
+        phis = torch.atan2(unit_centers[:, 0], unit_centers[:, 2])
         phis[phis < 0] += 2 * np.pi
         centers = unit_centers * radius.unsqueeze(-1)
     else:
@@ -110,15 +113,15 @@ def rand_poses(size, device, opt, radius_range=[1, 1.5], theta_range=[0, 120], p
             radius * torch.sin(thetas) * torch.sin(phis),
             radius * torch.cos(thetas),
             radius * torch.sin(thetas) * torch.cos(phis),
-        ], dim=-1) # [B, 3]
+        ], dim=-1)  # [B, 3]
 
     targets = 0
 
     # jitters
     if opt.jitter_pose:
-        jit_center = opt.jitter_center # 0.015  # was 0.2
+        jit_center = opt.jitter_center  # 0.015  # was 0.2
         jit_target = opt.jitter_target
-        centers += torch.rand_like(centers) * jit_center - jit_center/2.0
+        centers += torch.rand_like(centers) * jit_center - jit_center / 2.0
         targets += torch.randn_like(centers) * jit_target
 
     # lookat
@@ -149,8 +152,8 @@ def rand_poses(size, device, opt, radius_range=[1, 1.5], theta_range=[0, 120], p
     return poses, dirs, thetas, phis, radius
 
 
-def circle_poses(device, radius=torch.tensor([3.2]), theta=torch.tensor([60]), phi=torch.tensor([0]), return_dirs=False, angle_overhead=30, angle_front=60):
-
+def circle_poses(device, radius=torch.tensor([3.2]), theta=torch.tensor([60]), phi=torch.tensor([0]), return_dirs=False,
+                 angle_overhead=30, angle_front=60):
     theta = theta / 180 * np.pi
     phi = phi / 180 * np.pi
     angle_overhead = angle_overhead / 180 * np.pi
@@ -160,7 +163,7 @@ def circle_poses(device, radius=torch.tensor([3.2]), theta=torch.tensor([60]), p
         radius * torch.sin(theta) * torch.sin(phi),
         radius * torch.cos(theta),
         radius * torch.sin(theta) * torch.cos(phi),
-    ], dim=-1) # [B, 3]
+    ], dim=-1)  # [B, 3]
 
     # lookat
     forward_vector = safe_normalize(centers)
@@ -179,15 +182,17 @@ def circle_poses(device, radius=torch.tensor([3.2]), theta=torch.tensor([60]), p
 
     return poses, dirs
 
+
 def pose_2_w2c(pose):
     R, T = pose[:3, :3], pose[:3, 3]
     R = R.T
-    T = - R @ T 
+    T = - R @ T
     w2c = torch.zeros_like(pose)
     w2c[:3, :3] = R
     w2c[:3, 3] = T
     w2c[3, 3] = 1
     return w2c
+
 
 class NeRFPoseDataset:
     def __init__(self, opt, device, type="train", H=256, W=256, size=100):
@@ -195,7 +200,7 @@ class NeRFPoseDataset:
         # import pdb; pdb.set_trace()
         self.opt = opt
         self.device = device
-        self.type = type # train, val, test
+        self.type = type  # train, val, test
 
         self.H = H
         self.W = W
@@ -207,8 +212,8 @@ class NeRFPoseDataset:
         self.cy = self.W / 2
 
         self.near = self.opt.min_near
-        self.far = 1000 # infinite
-     
+        self.far = 1000  # infinite
+
     def get_default_view_data(self):
 
         # import pdb; pdb.set_trace()
@@ -221,24 +226,26 @@ class NeRFPoseDataset:
         radii = torch.FloatTensor(self.opt.ref_radii).to(self.device)
         thetas = torch.FloatTensor(self.opt.ref_polars).to(self.device)
         phis = torch.FloatTensor(self.opt.ref_azimuths).to(self.device)
-        poses, dirs = circle_poses(self.device, radius=radii, theta=thetas, phi=phis, return_dirs=True, angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
+        poses, dirs = circle_poses(self.device, radius=radii, theta=thetas, phi=phis, return_dirs=True,
+                                   angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
         fov = self.opt.default_fovy
         focal = H / (2 * np.tan(np.deg2rad(fov) / 2))
         intrinsics = np.array([focal, focal, cx, cy])
-        
+
         # default_focal, default_cx = 560 * 0.5, 256 * 0.5
         # fscale = H / 2 / default_cx
         # focal, cx = default_focal * fscale, default_cx * fscale
         # intrinsics = np.array([focal, focal, cx, cx])
 
         projection = torch.tensor([
-            [2*focal/W, 0, 0, 0],
-            [0, -2*focal/H, 0, 0],
-            [0, 0, -(self.far+self.near)/(self.far-self.near), -(2*self.far*self.near)/(self.far-self.near)],
+            [2 * focal / W, 0, 0, 0],
+            [0, -2 * focal / H, 0, 0],
+            [0, 0, -(self.far + self.near) / (self.far - self.near),
+             -(2 * self.far * self.near) / (self.far - self.near)],
             [0, 0, -1, 0]
         ], dtype=torch.float32, device=self.device).unsqueeze(0).repeat(len(radii), 1, 1)
 
-        mvp = projection @ torch.inverse(poses) # [B, 4, 4]
+        mvp = projection @ torch.inverse(poses)  # [B, 4, 4]
 
         # sample a low-resolution but full image
         rays = get_rays(poses, intrinsics, H, W, -1)
@@ -250,15 +257,15 @@ class NeRFPoseDataset:
             thetas = torch.FloatTensor([self.opt.default_polar]).to(self.device)
             phis = torch.FloatTensor([self.opt.default_azimuth]).to(self.device)
             radius = torch.FloatTensor([self.opt.default_radius]).to(self.device)
-            cond_rt, _ = circle_poses(self.device, radius=radius, theta=thetas, phi=phis, return_dirs=True, 
-                                        angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
+            cond_rt, _ = circle_poses(self.device, radius=radius, theta=thetas, phi=phis, return_dirs=True,
+                                      angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
             cond_rt = pose_2_w2c(cond_rt[0])
-
 
         w2c = [pose_2_w2c(poses[i]) for i in range(poses.shape[0])]
         relative_pose = [cond_rt @ torch.linalg.inv(w2c[idx]) for idx in range(len(w2c))]
         source_dist = torch.norm(cond_rt[:3, 3], p=2)
-        print(f"ref={[self.opt.ref_radii, self.opt.ref_polars, self.opt.ref_azimuths]}, cond/default={[self.opt.default_radius, self.opt.default_polar, self.opt.default_azimuth]}")
+        print(
+            f"ref={[self.opt.ref_radii, self.opt.ref_polars, self.opt.ref_azimuths]}, cond/default={[self.opt.default_radius, self.opt.default_polar, self.opt.default_azimuth]}")
         print(f"relative_pose: \n{relative_pose}")
 
         data = {
@@ -274,10 +281,10 @@ class NeRFPoseDataset:
         }
 
         return data
-    
+
     def collate(self, index):
         B = len(index)
-        
+
         H = int(self.opt.known_view_scale * self.H)
         W = int(self.opt.known_view_scale * self.W)
         cx = H / 2
@@ -285,14 +292,14 @@ class NeRFPoseDataset:
 
         if self.training:
             # random pose on the fly
-            poses, dirs, thetas, phis, radius = rand_poses(B, self.device, self.opt, 
-                                                radius_range=self.opt.radius_range, 
-                                                theta_range=self.opt.theta_range, 
-                                                phi_range=self.opt.phi_range, 
-                                                return_dirs=True, 
-                                                angle_overhead=self.opt.angle_overhead, 
-                                                angle_front=self.opt.angle_front, 
-                                                uniform_sphere_rate=self.opt.uniform_sphere_rate)
+            poses, dirs, thetas, phis, radius = rand_poses(B, self.device, self.opt,
+                                                           radius_range=self.opt.radius_range,
+                                                           theta_range=self.opt.theta_range,
+                                                           phi_range=self.opt.phi_range,
+                                                           return_dirs=True,
+                                                           angle_overhead=self.opt.angle_overhead,
+                                                           angle_front=self.opt.angle_front,
+                                                           uniform_sphere_rate=self.opt.uniform_sphere_rate)
             # random focal
             fov = random.random() * (self.opt.fovy_range[1] - self.opt.fovy_range[0]) + self.opt.fovy_range[0]
         else:
@@ -300,28 +307,30 @@ class NeRFPoseDataset:
             thetas = torch.FloatTensor([self.opt.default_polar]).to(self.device)
             phis = torch.FloatTensor([(index[0] / self.size) * 360]).to(self.device)
             radius = torch.FloatTensor([self.opt.default_radius]).to(self.device)
-            poses, dirs = circle_poses(self.device, radius=radius, theta=thetas, phi=phis, 
-                                        return_dirs=True, 
-                                        angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
+            poses, dirs = circle_poses(self.device, radius=radius, theta=thetas, phi=phis,
+                                       return_dirs=True,
+                                       angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
             fov = self.opt.default_fovy
 
-        # default_focal, default_cx = 560 * 0.5, 256 * 0.5
-        
-        # fscale = self.H / 2 / default_cx
-        # focal, cx = default_focal * fscale, default_cx * fscale
+        default_focal, default_cx = 560 * 0.5, 256 * 0.5
 
-        focal = self.H / (2 * np.tan(np.deg2rad(fov) / 2))
-        intrinsics = np.array([focal, focal, self.cx, self.cy])
-        # intrinsics = np.array([focal, focal, cx, cx])
+        fscale = self.H / 2 / default_cx
+        focal, cx = default_focal * fscale, default_cx * fscale
+        intrinsics = np.array([focal, focal, cx, cx])
+
+        # focal = self.H / (2 * np.tan(np.deg2rad(fov) / 2))
+        # intrinsics = np.array([focal, focal, self.cx, self.cy])
+
 
         projection = torch.tensor([
-            [2*focal/self.W, 0, 0, 0],
-            [0, -2*focal/self.H, 0, 0],
-            [0, 0, -(self.far+self.near)/(self.far-self.near), -(2*self.far*self.near)/(self.far-self.near)],
+            [2 * focal / self.W, 0, 0, 0],
+            [0, -2 * focal / self.H, 0, 0],
+            [0, 0, -(self.far + self.near) / (self.far - self.near),
+             -(2 * self.far * self.near) / (self.far - self.near)],
             [0, 0, -1, 0]
         ], dtype=torch.float32, device=self.device).unsqueeze(0)
 
-        mvp = projection @ torch.inverse(poses) # [1, 4, 4]
+        mvp = projection @ torch.inverse(poses)  # [1, 4, 4]
 
         # sample a low-resolution but full image
         rays = get_rays(poses, intrinsics, self.H, self.W, -1)
@@ -335,8 +344,8 @@ class NeRFPoseDataset:
             thetas = torch.FloatTensor([self.opt.default_polar]).to(self.device)
             phis = torch.FloatTensor([self.opt.default_azimuth]).to(self.device)
             radius = torch.FloatTensor([self.opt.default_radius]).to(self.device)
-            cond_rt, _ = circle_poses(self.device, radius=radius, theta=thetas, phi=phis, return_dirs=True, 
-                                        angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
+            cond_rt, _ = circle_poses(self.device, radius=radius, theta=thetas, phi=phis, return_dirs=True,
+                                      angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
             cond_rt = pose_2_w2c(cond_rt[0])
 
         relative_pose = [cond_rt @ torch.linalg.inv(w2c[idx]) for idx in range(len(w2c))]
@@ -348,21 +357,23 @@ class NeRFPoseDataset:
             'W': self.W,
             'rays_o': rays['rays_o'],
             'rays_d': rays['rays_d'],
-            'dir': dirs,                        
+            'dir': dirs,
             'mvp': mvp,
             'relative_pose': torch.stack(relative_pose)[:, :3, :4].unsqueeze(0),
             "intrinsic": torch.from_numpy(np.array([[560 * 0.5, 256 * 0.5]])),
             'source': source_dist,
             # 'txt': "",
         }
-        return data 
-    
+        return data
+
     def dataloader(self, batch_size=None):
         batch_size = batch_size or self.opt.batch_size
         batch_size = 1
-        loader = DataLoader(list(range(self.size)), batch_size=batch_size, collate_fn=self.collate, shuffle=self.training, num_workers=0)
+        loader = DataLoader(list(range(self.size)), batch_size=batch_size, collate_fn=self.collate,
+                            shuffle=self.training, num_workers=0)
         loader._data = self
         return loader
+
 
 class NeRFDataset:
     def __init__(self, opt, device, type='train', H=256, W=256, size=100):
@@ -370,7 +381,7 @@ class NeRFDataset:
         # import pdb; pdb.set_trace()
         self.opt = opt
         self.device = device
-        self.type = type # train, val, test
+        self.type = type  # train, val, test
 
         self.H = H
         self.W = W
@@ -382,7 +393,7 @@ class NeRFDataset:
         self.cy = self.W / 2
 
         self.near = self.opt.min_near
-        self.far = 1000 # infinite
+        self.far = 1000  # infinite
 
         # [debug] visualize poses
         # poses, dirs, _, _, _ = rand_poses(100, self.device, opt, radius_range=self.opt.radius_range, angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front, jitter=self.opt.jitter_pose, uniform_sphere_rate=1)
@@ -398,19 +409,21 @@ class NeRFDataset:
         radii = torch.FloatTensor(self.opt.ref_radii).to(self.device)
         thetas = torch.FloatTensor(self.opt.ref_polars).to(self.device)
         phis = torch.FloatTensor(self.opt.ref_azimuths).to(self.device)
-        poses, dirs = circle_poses(self.device, radius=radii, theta=thetas, phi=phis, return_dirs=True, angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
+        poses, dirs = circle_poses(self.device, radius=radii, theta=thetas, phi=phis, return_dirs=True,
+                                   angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
         fov = self.opt.default_fovy
         focal = H / (2 * np.tan(np.deg2rad(fov) / 2))
         intrinsics = np.array([focal, focal, cx, cy])
 
         projection = torch.tensor([
-            [2*focal/W, 0, 0, 0],
-            [0, -2*focal/H, 0, 0],
-            [0, 0, -(self.far+self.near)/(self.far-self.near), -(2*self.far*self.near)/(self.far-self.near)],
+            [2 * focal / W, 0, 0, 0],
+            [0, -2 * focal / H, 0, 0],
+            [0, 0, -(self.far + self.near) / (self.far - self.near),
+             -(2 * self.far * self.near) / (self.far - self.near)],
             [0, 0, -1, 0]
         ], dtype=torch.float32, device=self.device).unsqueeze(0).repeat(len(radii), 1, 1)
 
-        mvp = projection @ torch.inverse(poses) # [B, 4, 4]
+        mvp = projection @ torch.inverse(poses)  # [B, 4, 4]
 
         # sample a low-resolution but full image
         rays = get_rays(poses, intrinsics, H, W, -1)
@@ -435,19 +448,25 @@ class NeRFDataset:
 
         if self.training:
             # random pose on the fly
-            poses, dirs, thetas, phis, radius = rand_poses(B, self.device, self.opt, radius_range=self.opt.radius_range, theta_range=self.opt.theta_range, phi_range=self.opt.phi_range, return_dirs=True, angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front, uniform_sphere_rate=self.opt.uniform_sphere_rate)
+            poses, dirs, thetas, phis, radius = rand_poses(B, self.device, self.opt, radius_range=self.opt.radius_range,
+                                                           theta_range=self.opt.theta_range,
+                                                           phi_range=self.opt.phi_range, return_dirs=True,
+                                                           angle_overhead=self.opt.angle_overhead,
+                                                           angle_front=self.opt.angle_front,
+                                                           uniform_sphere_rate=self.opt.uniform_sphere_rate)
 
             # random focal
             fov = random.random() * (self.opt.fovy_range[1] - self.opt.fovy_range[0]) + self.opt.fovy_range[0]
 
         elif self.type == 'six_views':
             # six views
-            thetas_six = [90, 90,  90,  90, 1e-3, 179.999]
-            phis_six =   [ 0, 90, 180, -90,    0,       0]
+            thetas_six = [90, 90, 90, 90, 1e-3, 179.999]
+            phis_six = [0, 90, 180, -90, 0, 0]
             thetas = torch.FloatTensor([thetas_six[index[0]]]).to(self.device)
             phis = torch.FloatTensor([phis_six[index[0]]]).to(self.device)
             radius = torch.FloatTensor([self.opt.default_radius]).to(self.device)
-            poses, dirs = circle_poses(self.device, radius=radius, theta=thetas, phi=phis, return_dirs=True, angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
+            poses, dirs = circle_poses(self.device, radius=radius, theta=thetas, phi=phis, return_dirs=True,
+                                       angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
 
             # fixed focal
             fov = self.opt.default_fovy
@@ -457,7 +476,8 @@ class NeRFDataset:
             thetas = torch.FloatTensor([self.opt.default_polar]).to(self.device)
             phis = torch.FloatTensor([(index[0] / self.size) * 360]).to(self.device)
             radius = torch.FloatTensor([self.opt.default_radius]).to(self.device)
-            poses, dirs = circle_poses(self.device, radius=radius, theta=thetas, phi=phis, return_dirs=True, angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
+            poses, dirs = circle_poses(self.device, radius=radius, theta=thetas, phi=phis, return_dirs=True,
+                                       angle_overhead=self.opt.angle_overhead, angle_front=self.opt.angle_front)
 
             # fixed focal
             fov = self.opt.default_fovy
@@ -466,13 +486,14 @@ class NeRFDataset:
         intrinsics = np.array([focal, focal, self.cx, self.cy])
 
         projection = torch.tensor([
-            [2*focal/self.W, 0, 0, 0],
-            [0, -2*focal/self.H, 0, 0],
-            [0, 0, -(self.far+self.near)/(self.far-self.near), -(2*self.far*self.near)/(self.far-self.near)],
+            [2 * focal / self.W, 0, 0, 0],
+            [0, -2 * focal / self.H, 0, 0],
+            [0, 0, -(self.far + self.near) / (self.far - self.near),
+             -(2 * self.far * self.near) / (self.far - self.near)],
             [0, 0, -1, 0]
         ], dtype=torch.float32, device=self.device).unsqueeze(0)
 
-        mvp = projection @ torch.inverse(poses) # [1, 4, 4]
+        mvp = projection @ torch.inverse(poses)  # [1, 4, 4]
 
         # sample a low-resolution but full image
         rays = get_rays(poses, intrinsics, self.H, self.W, -1)
@@ -480,7 +501,7 @@ class NeRFDataset:
         # delta polar/azimuth/radius to default view
         delta_polar = thetas - self.opt.default_polar
         delta_azimuth = phis - self.opt.default_azimuth
-        delta_azimuth[delta_azimuth > 180] -= 360 # range in [-180, 180]
+        delta_azimuth[delta_azimuth > 180] -= 360  # range in [-180, 180]
         delta_radius = radius - self.opt.default_radius
 
         data = {
@@ -499,6 +520,7 @@ class NeRFDataset:
 
     def dataloader(self, batch_size=None):
         batch_size = batch_size or self.opt.batch_size
-        loader = DataLoader(list(range(self.size)), batch_size=batch_size, collate_fn=self.collate, shuffle=self.training, num_workers=0)
+        loader = DataLoader(list(range(self.size)), batch_size=batch_size, collate_fn=self.collate,
+                            shuffle=self.training, num_workers=0)
         loader._data = self
         return loader
