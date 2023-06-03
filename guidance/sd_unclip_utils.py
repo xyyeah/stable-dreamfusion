@@ -4,7 +4,7 @@ from diffusers.utils.import_utils import is_xformers_available
 from os.path import isfile
 from pathlib import Path
 
-from cldm.model import create_model
+from cldm.model import create_model, load_state_dict
 
 # suppress partial model loading warning
 logging.set_verbosity_error()
@@ -50,6 +50,7 @@ class StableDiffusionUnclip(nn.Module):
         print(f'[INFO] loading stable diffusion unclip...')
 
         model = create_model('cldm/unclip-l.yaml')
+        model.load_state_dict(load_state_dict('/workspace/ControlNet/models/sd21-unclip-l.ckpt'))
         self.model = model.to(device)
 
         # pipe = StableUnCLIPImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-2-1-unclip-small",
