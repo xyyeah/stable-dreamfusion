@@ -68,8 +68,6 @@ class StableDiffusionUnclip(nn.Module):
         #                                                subfolder="scheduler", torch_dtype=self.precision_t,
         #                                                cache_dir="./cache_dir")
         self.scheduler = pipe.scheduler
-        del pipe
-        del self.vae
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.min_step = int(self.num_train_timesteps * t_range[0])
