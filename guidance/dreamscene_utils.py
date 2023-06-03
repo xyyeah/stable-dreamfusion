@@ -326,11 +326,11 @@ class DreamScene(nn.Module):
                 model_uncond, model_t = model_output.chunk(2)
                 model_output = model_uncond + scale * (model_t - model_uncond)
                 if self.model.parameterization == "v":
-                    e_t = self.model.predict_eps_from_z_and_v(latents, t_in, model_output)
+                    e_t = self.model.predict_eps_from_z_and_v(latents, t, model_output)
                 else:
                     e_t = model_output
                 assert not torch.isnan(model_output).any()
-                latents = self.scheduler.step(e_t, t_in, latents, eta=ddim_eta)['prev_sample']
+                latents = self.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
 
             imgs = self.decode_latents(latents)
             print(imgs.amax(), imgs.amin(), imgs.mean())
