@@ -363,7 +363,7 @@ class NeRFPoseDataset:
             'dir': dirs,
             'mvp': mvp,
             'relative_pose': torch.stack(relative_pose)[:, :3, :4].unsqueeze(0),
-            "intrinsic": torch.from_numpy(np.array([[focal2, 256 * 0.5]])),
+            "intrinsic": torch.from_numpy(np.array([[560.0 * 0.5, 256 * 0.5]])),
             'source': source_dist,
             # 'txt': "",
         }
