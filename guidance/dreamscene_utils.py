@@ -217,6 +217,7 @@ class DreamScene(nn.Module):
             # import pdb; pdb.set_trace()
             model_output_sd, render_rgb = self.model.apply_model(x_in, t_in, c_in, return_rgb=True)
             model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
+            render_rgb = render_rgb.chunk(2)[1]
             model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
             e_t_sd = self.model.predict_eps_from_z_and_v(latents_noisy_768, t, model_output_sd)
 
@@ -235,9 +236,9 @@ class DreamScene(nn.Module):
             result_noisier_image = self.decode_latents(latents_noisy_768)
             rendered_imgs = self.decode_latents(render_rgb)
             # all 3 input images are [1, 3, H, W], e.g. [1, 3, 512, 512]
-            print(pred_rgb_256.size(), result_hopefully_less_noisy_image2.size(),
-                  result_noisier_image.size(), rendered_imgs.size())
-            exit(0)
+            # print(pred_rgb_256.size(), result_hopefully_less_noisy_image2.size(),
+            #       result_noisier_image.size(), rendered_imgs.size())
+            # exit(0)
             viz_images = torch.cat(
                 [pred_rgb_256, result_noisier_image,
                  result_hopefully_less_noisy_image2, rendered_imgs
