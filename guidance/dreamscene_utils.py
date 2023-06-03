@@ -157,32 +157,34 @@ class DreamScene(nn.Module):
                    guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
         # pred_rgb: tensor [1, 3, H, W] in [0, 1]
         # adjust SDS scale based on how far the novel view is from the known view
-        return self.sd_model.train_step(
-            torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0),
-            pred_rgb
-        )
+        # return self.sd_model.train_step(
+        #     torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0),
+        #     pred_rgb,
+        #     guidance_scale,
+        # )
+        text_embeddings = torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0)
 
-        n_pose = pose.size(1)
-        if n_pose > 1:
-            intrinsic = intrinsic.repeat(n_pose, 1)
-            dist = dist.view(1).repeat(n_pose)
-        pose = torch.cat(pose.unbind(dim=1), dim=0)
+        # n_pose = pose.size(1)
+        # if n_pose > 1:
+        #     intrinsic = intrinsic.repeat(n_pose, 1)
+        #     dist = dist.view(1).repeat(n_pose)
+        # pose = torch.cat(pose.unbind(dim=1), dim=0)
 
         if as_latent:
             latents = F.interpolate(pred_rgb, (32, 32), mode="bilinear", align_corners=True) * 2 - 1
         else:
             pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=True) * 2 - 1
-            latents = self.encode_imgs(pred_rgb_256)
+            latents = self.sd_model.encode_imgs(pred_rgb_256)
 
             pred_rgb_768 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=True) * 2 - 1
-            latents_768 = self.encode_imgs(pred_rgb_768)
+            latents_768 = self.sd_model.encode_imgs(pred_rgb_768)
 
         t = torch.randint(self.min_step, self.max_step + 1, (latents_768.shape[0],), dtype=torch.long,
                           device=self.device)
 
         # q sample
         with torch.no_grad():
-            noise = torch.randn_like(latents)
+            # noise = torch.randn_like(latents)
 
             t_in = torch.cat([t] * 2).to(self.device)
 
@@ -193,7 +195,6 @@ class DreamScene(nn.Module):
             latents_noisy_768 = self.scheduler.add_noise(latents_768, noise_768, t)
             x_in = torch.cat([latents_noisy_768] * 2)
 
-            text_embeddings = torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0)
             model_output_sd = self.sd_model.unet(x_in, t_in, encoder_hidden_states=text_embeddings).sample
 
             # img_embeds = embeddings["c_adm"][0]
