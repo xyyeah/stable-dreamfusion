@@ -159,7 +159,7 @@ class DreamScene(nn.Module):
                    guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
         # pred_rgb: tensor [1, 3, H, W] in [0, 1]
         # adjust SDS scale based on how far the novel view is from the known view
-        loss1 = self.sd_model2.train_step(
+        loss1, t = self.sd_model2.train_step(
             torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0),
             pred_rgb,
             guidance_scale,
@@ -178,8 +178,8 @@ class DreamScene(nn.Module):
             pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=True) * 2 - 1
             latents_768 = self.encode_imgs(pred_rgb_256)
 
-        t = torch.randint(self.min_step, self.max_step + 1, (latents_768.shape[0],), dtype=torch.long,
-                          device=self.device)
+        # t = torch.randint(self.min_step, self.max_step + 1, (latents_768.shape[0],), dtype=torch.long,
+        #                   device=self.device)
 
         # q sample
         with torch.no_grad():
@@ -242,11 +242,10 @@ class DreamScene(nn.Module):
             viz_images = torch.cat(
                 [pred_rgb_256, result_noisier_image,
                  result_hopefully_less_noisy_image2, rendered_imgs
-            ], dim=-1)
+                 ], dim=-1)
             save_image(viz_images, save_guidance_path)
 
-        # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(latents_768, grad)  # + SpecifyGradient.apply(latents_768, grad2)
+        loss = SpecifyGradient.apply(latents_768, grad)
 
         return loss1 - loss
 
