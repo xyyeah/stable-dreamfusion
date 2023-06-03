@@ -321,17 +321,15 @@ class DreamScene(nn.Module):
                     else:
                         c_in[k] = cond[k]
 
-                model_output = self.sd_model.model(
-                    x_in, t_in, c_in
-                )[0]
+                model_output = self.model.apply_model(x_in, t_in, c_in)
                 model_uncond, model_t = model_output.chunk(2)
-                assert not torch.isnan(model_output).any()
+
                 model_output = model_uncond + scale * (model_t - model_uncond)
-                # if self.model.parameterization == "v":
-                #     e_t = self.model.predict_eps_from_z_and_v(latents, t.view(1).to(self.device), model_output)
-                # else:
-                #     e_t = model_output
-                e_t = model_output
+                if self.model.parameterization == "v":
+                    e_t = self.model.predict_eps_from_z_and_v(latents, t, model_output)
+                else:
+                    e_t = model_output
+                assert not torch.isnan(model_output).any()
                 latents = self.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
 
             imgs = self.decode_latents(latents)
