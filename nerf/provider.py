@@ -231,7 +231,7 @@ class NeRFPoseDataset:
         fov = self.opt.default_fovy
 
         default_focal, default_cx = 560 * 0.5, 256 * 0.5
-        fov = np.rad2deg(2 * np.arctan(default_cx / default_focal))
+        # fov = np.rad2deg(2 * np.arctan(default_cx / default_focal))
         print('fov', fov, self.opt.default_fovy)
         focal = H / (2 * np.tan(np.deg2rad(fov) / 2))
         intrinsics = np.array([focal, focal, cx, cy])
@@ -316,7 +316,7 @@ class NeRFPoseDataset:
 
         # focal = H / (2 * tan(fov/2))
         # H / focal  / 2 = tan(fov/2)
-        default_focal, default_cx = 560 * 0.5, 256 * 0.5
+        # default_focal, default_cx = 560 * 0.5, 256 * 0.5
         # fov = np.rad2deg(2 * np.arctan(default_cx / default_focal))
         focal = self.H / (2 * np.tan(np.deg2rad(fov) / 2))
         focal2 = 256.0 / (2 * np.tan(np.deg2rad(fov) / 2))
