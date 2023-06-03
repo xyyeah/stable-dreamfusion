@@ -326,7 +326,7 @@ class DreamScene(nn.Module):
                 model_uncond, model_t = model_output.chunk(2)
                 model_output = model_uncond + scale * (model_t - model_uncond)
                 if self.model.parameterization == "v":
-                    print('fuck', t.device, self.sd_model.model..alphas_cumprod.device)
+                    print('fuck', t.device, self.sd_model.model.alphas_cumprod.device)
                     e_t = self.sd_model.model.predict_eps_from_z_and_v(latents, t, model_output)
                 else:
                     e_t = model_output
