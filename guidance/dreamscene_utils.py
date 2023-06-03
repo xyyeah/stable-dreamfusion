@@ -190,7 +190,7 @@ class DreamScene(nn.Module):
             noise_preds_sd = []
             num_imgs = len(embeddings["c_crossattn"])
 
-            noise_768 = F.interpolate(noise, (32, 32), mode="nearest")
+            noise_768 = torch.randn_like(latents_768)
             latents_noisy_768 = self.scheduler.add_noise(latents_768, noise_768, t)
             x_in = torch.cat([latents_noisy_768] * 2)
 
@@ -225,7 +225,7 @@ class DreamScene(nn.Module):
         noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
         w = (1 - self.alphas[t])
-        grad = (grad_scale * w)[:, None, None, None] * noise_pred_sd
+        grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_768)
         grad = torch.nan_to_num(grad)
 
         if save_guidance_path:
@@ -247,7 +247,7 @@ class DreamScene(nn.Module):
 
         loss = SpecifyGradient.apply(latents_768, grad)
 
-        return loss1 - loss
+        return loss1 + loss
 
     # def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
     #                guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):

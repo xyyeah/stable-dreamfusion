@@ -319,7 +319,7 @@ class NeRFPoseDataset:
         # default_focal, default_cx = 560 * 0.5, 256 * 0.5
         # fov = np.rad2deg(2 * np.arctan(default_cx / default_focal))
         focal = self.H / (2 * np.tan(np.deg2rad(fov) / 2))
-        focal2 = 256.0 / (2 * np.tan(np.deg2rad(fov) / 2))
+        focal2 = 256.0 / (2 * np.tan(np.deg2rad(30.0) / 2))
         intrinsics = np.array([focal, focal, cx, cy])
         # print('fov', fov, self.opt.default_fovy)
 
@@ -363,7 +363,7 @@ class NeRFPoseDataset:
             'dir': dirs,
             'mvp': mvp,
             'relative_pose': torch.stack(relative_pose)[:, :3, :4].unsqueeze(0),
-            "intrinsic": torch.from_numpy(np.array([[560.0 * 0.5, 256 * 0.5]])),
+            "intrinsic": torch.from_numpy(np.array([[focal2, 256 * 0.5]])),
             'source': source_dist,
             # 'txt': "",
         }
