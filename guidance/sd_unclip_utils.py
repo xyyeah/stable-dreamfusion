@@ -70,8 +70,6 @@ class StableDiffusionUnclip(nn.Module):
                                                        cache_dir="./cache_dir")
 
         del pipe
-        del self.tokenizer
-        del self.text_encoder
         del self.vae
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps

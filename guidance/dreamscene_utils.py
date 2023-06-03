@@ -146,7 +146,10 @@ class DreamScene(nn.Module):
         return cs, vs, cadms
 
     def get_text_embeds(self, x):
-        return self.model.get_learned_conditioning(x)
+        inputs = self.sd_model.tokenizer(x, padding='max_length', max_length=self.tokenizer.model_max_length,
+                                         return_tensors='pt')
+        embeddings = self.sd_model.text_encoder(inputs.input_ids.to(self.device))[0]
+        return embeddings
 
     def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
                    guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
@@ -221,6 +224,7 @@ class DreamScene(nn.Module):
                 class_labels=torch.cat([img_embeds, img_embeds], dim=0),
                 encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0)
             )[0]
+
             model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
             model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
             if self.model.parameterization == "v":
@@ -264,14 +268,13 @@ class DreamScene(nn.Module):
             save_image(viz_images, save_guidance_path)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(latents, grad) # + SpecifyGradient.apply(latents_768, grad2)
+        loss = SpecifyGradient.apply(latents, grad)  # + SpecifyGradient.apply(latents_768, grad2)
 
         return loss
 
-    # verification
     @torch.no_grad()
-    def __call__(self, image, pose, instrinsic, dist,
-                 scale=3, ddim_steps=50, ddim_eta=1, h=256, w=256,
+    def __call__(self, image, text,
+                 scale=3, ddim_steps=50, ddim_eta=0.0, h=768, w=768,
                  c_crossattn=None, c_concat=None, c_adm=None, post_process=True
                  ):
 
@@ -287,52 +290,24 @@ class DreamScene(nn.Module):
             # import pdb; pdb.set_trace()
             c_crossattn = embeddings["c_crossattn"]
         # import pdb; pdb.set_trace()
-
-        n_pose = pose.size(1)
-        if n_pose > 1:
-            instrinsic = instrinsic.repeat(n_pose, 1)
-            dist = dist.view(1).repeat(n_pose)
-        pose = torch.cat(pose.unbind(dim=1), dim=0)
-
-        if c_concat is None:
-            c_concat = embeddings["c_concat"]
-            recons = self.model.decode_first_stage(c_concat[0])
-
-        if c_adm is None:
-            c_adm = embeddings["c_adm"]
-
-        cond = {"c_crossattn": c_crossattn, "c_concat": c_concat, "c_adm": c_adm[0], "pose": pose,
-                "intrinsic": instrinsic, "dist": dist}
-        for k, v in cond.items():
-            if isinstance(v, (list, tuple)):
-                print(k, len(v), v[0].shape)
-            elif isinstance(v, torch.Tensor):
-                print(k, v.shape)
-            else:
-                print(k, v)
-        uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)],
-                  "c_concat": c_concat,
-                  'c_adm': c_adm[0], "pose": pose, "intrinsic": instrinsic, "dist": dist.view(1)}
-
         # produce latents loop
         latents = torch.randn((1, 4, h // 8, w // 8), device=self.device)
         self.scheduler.set_timesteps(ddim_steps)
 
+        text_embeds = self.get_text_embeds(text)
+        neg_text_embeds = self.get_text_embeds([""])
+
         for i, t in enumerate(self.scheduler.timesteps):
             x_in = torch.cat([latents] * 2)
             t_in = torch.cat([t.view(1)] * 2).to(self.device)
-            c_in = dict()
-            for k in cond:
-                if isinstance(cond[k], list):
-                    c_in[k] = [torch.cat([uncond[k][i], cond[k][i]]) for i in range(len(cond[k]))]
-                elif isinstance(cond[k], torch.Tensor):
-                    c_in[k] = torch.cat([uncond[k], cond[k]])
-                else:
-                    c_in[k] = cond[k]
 
-            model_output, render_rgb = self.model.apply_model(x_in, t_in, c_in, return_rgb=True)
+            img_embeds = embeddings["c_adm"][0]
+            model_output = self.sd_model.unet(
+                x_in, t_in,
+                class_labels=torch.cat([img_embeds, img_embeds], dim=0),
+                encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0)
+            )
             model_uncond, model_t = model_output.chunk(2)
-            render_rgb = render_rgb.chunk(2)[1]
             model_output = model_uncond + scale * (model_t - model_uncond)
             if self.model.parameterization == "v":
                 e_t = self.model.predict_eps_from_z_and_v(latents, t.view(1).to(self.device), model_output)
@@ -342,9 +317,85 @@ class DreamScene(nn.Module):
 
         imgs = self.decode_latents(latents)
         imgs = imgs.cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
-        render_rgb = self.decode_latents(render_rgb)
-        render_rgb = render_rgb.cpu().numpy().transpose(0, 2, 3, 1) if post_process else render_rgb
-        return imgs, render_rgb, recons.cpu().numpy().transpose(0, 2, 3, 1) if post_process else recons
+        return imgs, recons.cpu().numpy().transpose(0, 2, 3, 1) if post_process else recons
+
+    # verification
+    # @torch.no_grad()
+    # def __call__(self, image, pose, instrinsic, dist,
+    #              scale=3, ddim_steps=50, ddim_eta=1, h=256, w=256,
+    #              c_crossattn=None, c_concat=None, c_adm=None, post_process=True
+    #              ):
+    #
+    #     if c_crossattn is None:
+    #         if len(image[0].shape) == 3:
+    #             image = [img.unsqueeze(0) for img in image]
+    #
+    #         embeddings = self.get_img_embeds(image)
+    #         embeddings = {'c_crossattn': embeddings[0],
+    #                       'c_concat': embeddings[1],
+    #                       'c_adm': embeddings[2], }
+    #
+    #         # import pdb; pdb.set_trace()
+    #         c_crossattn = embeddings["c_crossattn"]
+    #     # import pdb; pdb.set_trace()
+    #
+    #     n_pose = pose.size(1)
+    #     if n_pose > 1:
+    #         instrinsic = instrinsic.repeat(n_pose, 1)
+    #         dist = dist.view(1).repeat(n_pose)
+    #     pose = torch.cat(pose.unbind(dim=1), dim=0)
+    #
+    #     if c_concat is None:
+    #         c_concat = embeddings["c_concat"]
+    #         recons = self.model.decode_first_stage(c_concat[0])
+    #
+    #     if c_adm is None:
+    #         c_adm = embeddings["c_adm"]
+    #
+    #     cond = {"c_crossattn": c_crossattn, "c_concat": c_concat, "c_adm": c_adm[0], "pose": pose,
+    #             "intrinsic": instrinsic, "dist": dist}
+    #     for k, v in cond.items():
+    #         if isinstance(v, (list, tuple)):
+    #             print(k, len(v), v[0].shape)
+    #         elif isinstance(v, torch.Tensor):
+    #             print(k, v.shape)
+    #         else:
+    #             print(k, v)
+    #     uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)],
+    #               "c_concat": c_concat,
+    #               'c_adm': c_adm[0], "pose": pose, "intrinsic": instrinsic, "dist": dist.view(1)}
+    #
+    #     # produce latents loop
+    #     latents = torch.randn((1, 4, h // 8, w // 8), device=self.device)
+    #     self.scheduler.set_timesteps(ddim_steps)
+    #
+    #     for i, t in enumerate(self.scheduler.timesteps):
+    #         x_in = torch.cat([latents] * 2)
+    #         t_in = torch.cat([t.view(1)] * 2).to(self.device)
+    #         c_in = dict()
+    #         for k in cond:
+    #             if isinstance(cond[k], list):
+    #                 c_in[k] = [torch.cat([uncond[k][i], cond[k][i]]) for i in range(len(cond[k]))]
+    #             elif isinstance(cond[k], torch.Tensor):
+    #                 c_in[k] = torch.cat([uncond[k], cond[k]])
+    #             else:
+    #                 c_in[k] = cond[k]
+    #
+    #         model_output, render_rgb = self.model.apply_model(x_in, t_in, c_in, return_rgb=True)
+    #         model_uncond, model_t = model_output.chunk(2)
+    #         render_rgb = render_rgb.chunk(2)[1]
+    #         model_output = model_uncond + scale * (model_t - model_uncond)
+    #         if self.model.parameterization == "v":
+    #             e_t = self.model.predict_eps_from_z_and_v(latents, t.view(1).to(self.device), model_output)
+    #         else:
+    #             e_t = model_output
+    #         latents = self.scheduler.step(e_t, t, latents, eta=ddim_eta)['prev_sample']
+    #
+    #     imgs = self.decode_latents(latents)
+    #     imgs = imgs.cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
+    #     render_rgb = self.decode_latents(render_rgb)
+    #     render_rgb = render_rgb.cpu().numpy().transpose(0, 2, 3, 1) if post_process else render_rgb
+    #     return imgs, render_rgb, recons.cpu().numpy().transpose(0, 2, 3, 1) if post_process else recons
 
     def decode_latents(self, latents):
 
@@ -445,11 +496,11 @@ if __name__ == "__main__":
     print(f'[INFO] loading model ...')
     model = DreamScene(device, opt.fp16)
 
-    outputs = model([image], pose=relative_poses, instrinsic=intrinsic, dist=source_dist)
-    images, renders, recons = outputs
+    outputs = model([image, ["teddy bear"]], pose=relative_poses, instrinsic=intrinsic, dist=source_dist)
+    images, recons = outputs
     os.makedirs("debug_res", exist_ok=True)
     for idx in range(images.shape[0]):
         # import pdb; pdb.set_trace()
-        Image.fromarray((images[idx] * 255.0).astype(np.uint8)).save(f"debug_res/{idx}_rgb.png")
-        Image.fromarray((renders[idx] * 255.0).astype(np.uint8)).save(f"debug_res/{idx}_render.png")
-        Image.fromarray((recons[idx] * 255.0).astype(np.uint8)).save(f"debug_res/{idx}_recon.png")
+        Image.fromarray((images[idx] * 255.0).astype(np.uint8)).save(f"/workspace/debug_res/{idx}_rgb.png")
+        # Image.fromarray((renders[idx] * 255.0).astype(np.uint8)).save(f"debug_res/{idx}_render.png")
+        Image.fromarray((recons[idx] * 255.0).astype(np.uint8)).save(f"/workspace/debug_res/{idx}_recon.png")
