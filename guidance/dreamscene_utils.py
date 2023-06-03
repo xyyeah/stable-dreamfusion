@@ -174,7 +174,7 @@ class DreamScene(nn.Module):
             latents = F.interpolate(pred_rgb, (32, 32), mode="bilinear", align_corners=True) * 2 - 1
         else:
             pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=True) * 2 - 1
-            latents = self.sd_model.encode_imgs(pred_rgb_256)
+            latents = self.encode_imgs(pred_rgb_256)
 
             pred_rgb_768 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=True) * 2 - 1
             latents_768 = self.sd_model.encode_imgs(pred_rgb_768)
@@ -219,11 +219,7 @@ class DreamScene(nn.Module):
             noise_preds_sd.append(e_t_sd)
         noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
-        w = (1 - self.alphas[t])
-        # grad = (grad_scale * w)[:, None, None, None] * (noise_pred - noise)
-        # grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_pred)
-        # grad = (grad_scale * w)[:, None, None, None] * (-noise_pred)
-        # grad2 = (grad_scale * w)[:, None, None, None] * noise_pred_sd
+        w = (1 - self.sd_model.alphas[t])
         grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_768)
         grad = torch.nan_to_num(grad)
         # grad2 = torch.nan_to_num(grad2)
@@ -525,7 +521,7 @@ class DreamScene(nn.Module):
 
     def encode_imgs(self, imgs):
         latents = torch.cat(
-            [self.model.get_first_stage_encoding(self.model.encode_first_stage(img.unsqueeze(0))) for img in imgs],
+            [self.model.get_first_stage_encoding(self.model.encode_first_stage(img.unsqueeze(0)).dist) for img in imgs],
             dim=0)
         return latents  # [B, 4, 32, 32] Latent space image
 

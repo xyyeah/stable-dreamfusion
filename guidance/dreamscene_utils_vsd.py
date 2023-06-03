@@ -344,7 +344,7 @@ class DreamScene(nn.Module):
 
     def encode_imgs(self, imgs):
         latents = torch.cat(
-            [self.model.get_first_stage_encoding(self.model.encode_first_stage(img.unsqueeze(0))) for img in imgs],
+            [self.model.get_first_stage_encoding(self.model.encode_first_stage(img.unsqueeze(0)).dist) for img in imgs],
             dim=0)
         return latents  # [B, 4, 32, 32] Latent space image
 
