@@ -220,12 +220,18 @@ class DreamScene(nn.Module):
             img_embeds = embeddings["c_adm"][0]
             text_embeds = embeddings['prompt_embeds']
             neg_text_embeds = embeddings['neg_prompt_embeds']
-            model_output_sd = self.sd_model.unet(
-                x_in, t_in,
-                class_labels=torch.cat([img_embeds, img_embeds], dim=0),
-                encoder_hidden_states=torch.cat([neg_text_embeds, text_embeds], dim=0)
-            )[0]
+            cond = {"c_crossattn": [text_embeds], "c_adm": img_embeds}
+            uncond = {"c_crossattn": [neg_text_embeds], 'c_adm': torch.zeros_like(img_embeds)}
+            c_in = dict()
+            for k in cond:
+                if isinstance(cond[k], list):
+                    c_in[k] = [torch.cat([uncond[k][i], cond[k][i]]) for i in range(len(cond[k]))]
+                elif isinstance(cond[k], torch.Tensor):
+                    c_in[k] = torch.cat([uncond[k], cond[k]])
+                else:
+                    c_in[k] = cond[k]
 
+            model_output_sd = self.sd_model.model.apply_model(x_in, t_in, c_in)
             model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
             model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
             if self.model.parameterization == "v":
@@ -239,13 +245,13 @@ class DreamScene(nn.Module):
         noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
         w = (1 - self.alphas[t])
-        grad = (grad_scale * w)[:, None, None, None] * (noise_pred - noise)
+        # grad = (grad_scale * w)[:, None, None, None] * (noise_pred - noise)
         # grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_pred)
-        # grad = (grad_scale * w)[:, None, None, None] * (-noise_pred)
-        # grad2 = (grad_scale * w)[:, None, None, None] * noise_pred_sd
+        grad = (grad_scale * w)[:, None, None, None] * (-noise_pred)
+        grad2 = (grad_scale * w)[:, None, None, None] * noise_pred_sd
         # grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise)
         grad = torch.nan_to_num(grad)
-        # grad2 = torch.nan_to_num(grad2)
+        grad2 = torch.nan_to_num(grad2)
 
         if save_guidance_path:
             with torch.no_grad():
@@ -269,7 +275,7 @@ class DreamScene(nn.Module):
             save_image(viz_images, save_guidance_path)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(latents, grad)  # + SpecifyGradient.apply(latents_768, grad2)
+        loss = SpecifyGradient.apply(latents, grad) + SpecifyGradient.apply(latents_768, grad2)
 
         return loss
 
