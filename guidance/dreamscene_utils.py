@@ -164,6 +164,7 @@ class DreamScene(nn.Module):
             pred_rgb,
             guidance_scale,
         )
+        return loss1
         # text_embeddings = torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0)
 
         n_pose = pose.size(1)
