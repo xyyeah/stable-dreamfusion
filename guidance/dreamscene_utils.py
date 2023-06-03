@@ -159,7 +159,7 @@ class DreamScene(nn.Module):
                    guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
         # pred_rgb: tensor [1, 3, H, W] in [0, 1]
         # adjust SDS scale based on how far the novel view is from the known view
-        loss1, t = self.sd_model2.train_step(
+        loss1, t, noise = self.sd_model2.train_step(
             torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0),
             pred_rgb,
             guidance_scale,
@@ -190,7 +190,7 @@ class DreamScene(nn.Module):
             noise_preds_sd = []
             num_imgs = len(embeddings["c_crossattn"])
 
-            noise_768 = torch.randn_like(latents_768)
+            noise_768 = F.interpolate(noise, (256, 256), mode="nearest", align_corners=True)
             latents_noisy_768 = self.scheduler.add_noise(latents_768, noise_768, t)
             x_in = torch.cat([latents_noisy_768] * 2)
 
