@@ -129,7 +129,7 @@ class DreamScene(nn.Module):
         self.max_step = int(self.num_train_timesteps * t_range[1])
         self.alphas = self.scheduler.alphas_cumprod.to(self.device)  # for convenience
 
-        self.sd_model = StableDiffusionUnclip(device, fp16, False)
+        # self.sd_model = StableDiffusionUnclip(device, fp16, False)
         self.sd_model2 = StableDiffusion(device, fp16, False)
         # del self.model.vae.decoder
 
@@ -159,11 +159,11 @@ class DreamScene(nn.Module):
                    guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
         # pred_rgb: tensor [1, 3, H, W] in [0, 1]
         # adjust SDS scale based on how far the novel view is from the known view
-        # return self.sd_model.train_step(
-        #     torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0),
-        #     pred_rgb,
-        #     guidance_scale,
-        # )
+        return self.sd_model2.train_step(
+            torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0),
+            pred_rgb,
+            guidance_scale,
+        )
         text_embeddings = torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0)
 
         # n_pose = pose.size(1)
@@ -231,10 +231,10 @@ class DreamScene(nn.Module):
 
         if save_guidance_path:
             pred_rgb_768 = torch.clamp((pred_rgb_768 + 1.0) / 2.0, min=0.0, max=1.0)
-            result_hopefully_less_noisy_image2 = self.decode_latents(
+            result_hopefully_less_noisy_image2 = self.sd_model2.decode_latents(
                 self.model.predict_start_from_noise(latents_noisy_768, t, noise_pred_sd))
             # visualize noisier image
-            result_noisier_image = self.decode_latents(latents_noisy_768)
+            result_noisier_image = self.sd_model2.decode_latents(latents_noisy_768)
 
             # all 3 input images are [1, 3, H, W], e.g. [1, 3, 512, 512]
             viz_images = torch.cat(

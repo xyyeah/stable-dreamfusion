@@ -58,6 +58,7 @@ class StableDiffusion(nn.Module):
             model_key = "runwayml/stable-diffusion-v1-5"
         else:
             raise ValueError(f'Stable-diffusion version {self.sd_version} not supported.')
+        model_key = 'stabilityai/stable-diffusion-2-1'
 
         self.precision_t = torch.float16 if fp16 else torch.float32
 
@@ -106,7 +107,7 @@ class StableDiffusion(nn.Module):
             latents = F.interpolate(pred_rgb, (64, 64), mode='bilinear', align_corners=False) * 2 - 1
         else:
             # interp to 512x512 to be fed into vae.
-            pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode='bilinear', align_corners=False)
+            pred_rgb_512 = F.interpolate(pred_rgb, (768, 768), mode='bilinear', align_corners=False)
             # encode image into latents with vae, requires grad!
             latents = self.encode_imgs(pred_rgb_512)
 
@@ -152,7 +153,8 @@ class StableDiffusion(nn.Module):
             latents = F.interpolate(pred_rgb, (64, 64), mode='bilinear', align_corners=False) * 2 - 1
         else:
             # interp to 512x512 to be fed into vae.
-            pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode='bilinear', align_corners=False)
+            # pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode='bilinear', align_corners=False)
+            pred_rgb_512 = F.interpolate(pred_rgb, (768, 768), mode='bilinear', align_corners=False)
             # encode image into latents with vae, requires grad!
             latents = self.encode_imgs(pred_rgb_512)
 
