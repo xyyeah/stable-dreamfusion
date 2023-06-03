@@ -296,13 +296,14 @@ class DreamScene(nn.Module):
         recons = self.model.decode_first_stage(embeddings['c_concat'][0]).clamp(-1.0, 1.0)
         text_embeds = self.get_text_embeds(text)
         neg_text_embeds = self.get_text_embeds([""])
+        img_embeds = embeddings["c_adm"][0]
+        img_embeds = torch.zeros_like(img_embeds)
 
         for i, t in enumerate(self.sd_model.scheduler.timesteps):
             print(i)
             x_in = torch.cat([latents] * 2)
             t_in = torch.cat([t.view(1)] * 2).to(self.device)
 
-            img_embeds = embeddings["c_adm"][0]
             model_output = self.sd_model.unet(
                 x_in, t_in,
                 class_labels=torch.cat([img_embeds, img_embeds], dim=0),
