@@ -303,7 +303,7 @@ class DreamScene(nn.Module):
             neg_text_embeds = torch.zeros_like(neg_text_embeds)
 
             for i, t in enumerate(self.scheduler.timesteps):
-                t = torch.full((1,), t, device=device, dtype=torch.long)
+                t = torch.full((1,), t, device=self.device, dtype=torch.long)
                 print(i, t)
                 x_in = torch.cat([latents] * 2)
                 t_in = torch.cat([t] * 2).to(self.device)
