@@ -232,13 +232,9 @@ class NeRFPoseDataset:
 
         default_focal, default_cx = 560 * 0.5, 256 * 0.5
         fov = np.rad2deg(2 * np.arctan(default_cx / default_focal))
+        print('fov', fov, self.opt.default_fovy)
         focal = H / (2 * np.tan(np.deg2rad(fov) / 2))
         intrinsics = np.array([focal, focal, cx, cy])
-
-        # default_focal, default_cx = 560 * 0.5, 256 * 0.5
-        # fscale = H / 2 / default_cx
-        # focal, cx = default_focal * fscale, default_cx * fscale
-        # intrinsics = np.array([focal, focal, cx, cx])
 
         projection = torch.tensor([
             [2 * focal / W, 0, 0, 0],
@@ -319,10 +315,6 @@ class NeRFPoseDataset:
         # H / focal  / 2 = tan(fov/2)
         default_focal, default_cx = 560 * 0.5, 256 * 0.5
         fov = np.rad2deg(2 * np.arctan(default_cx / default_focal))
-        # fscale = self.H / 2 / default_cx
-        # focal, cx = default_focal * fscale, default_cx * fscale
-        # intrinsics = np.array([focal, focal, cx, cx])
-
         focal = self.H / (2 * np.tan(np.deg2rad(fov) / 2))
         intrinsics = np.array([focal, focal, cx, cx])
 
