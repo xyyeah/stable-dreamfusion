@@ -151,7 +151,7 @@ class DreamScene(nn.Module):
         #                                  return_tensors='pt')
         # embeddings = self.sd_model.text_encoder(inputs.input_ids.to(self.device))[0]
         # return embeddings
-        return self.model.get_learned_conditioning(x)
+        return self.sd_model.get_text_embeds(x)
 
     def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
                    guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
@@ -167,6 +167,8 @@ class DreamScene(nn.Module):
         if as_latent:
             latents = F.interpolate(pred_rgb, (32, 32), mode="bilinear", align_corners=True) * 2 - 1
         else:
+            pred_rgb_256 = F.interpolate(pred_rgb, (256, 256), mode="bilinear", align_corners=True) * 2 - 1
+            latents = self.encode_imgs(pred_rgb_256)
 
             pred_rgb_768 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=True) * 2 - 1
             latents_768 = self.encode_imgs(pred_rgb_768)
@@ -176,7 +178,7 @@ class DreamScene(nn.Module):
 
         # q sample
         with torch.no_grad():
-            noise = torch.randn_like(latents_768)
+            noise = torch.randn_like(latents)
 
             t_in = torch.cat([t] * 2).to(self.device)
 
