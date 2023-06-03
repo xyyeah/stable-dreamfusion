@@ -147,11 +147,11 @@ class DreamScene(nn.Module):
         return cs, vs, cadms
 
     def get_text_embeds(self, x):
-        inputs = self.sd_model.tokenizer(x, padding='max_length', max_length=self.tokenizer.model_max_length,
-                                         return_tensors='pt')
-        embeddings = self.sd_model.text_encoder(inputs.input_ids.to(self.device))[0]
-        return embeddings
-        # return self.sd_model.get_text_embeds(x)
+        # inputs = self.sd_model.tokenizer(x, padding='max_length', max_length=self.tokenizer.model_max_length,
+        #                                  return_tensors='pt')
+        # embeddings = self.sd_model.text_encoder(inputs.input_ids.to(self.device))[0]
+        # return embeddings
+        return self.sd_model.get_text_embeds(x)
 
     def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
                    guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
@@ -222,7 +222,7 @@ class DreamScene(nn.Module):
             noise_preds_sd.append(e_t_sd)
         noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
-        w = (1 - self.sd_model.alphas[t])
+        w = (1 - self.alphas[t])
         grad = (grad_scale * w)[:, None, None, None] * (latents_noisy_768 - noise_768)
         grad = torch.nan_to_num(grad)
         # grad2 = torch.nan_to_num(grad2)

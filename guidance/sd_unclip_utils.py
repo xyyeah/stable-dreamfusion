@@ -86,9 +86,9 @@ class StableDiffusionUnclip(nn.Module):
     def get_text_embeds(self, prompt):
         # prompt: [str]
 
-        inputs = self.tokenizer(prompt, padding='max_length', max_length=self.tokenizer.model_max_length,
+        inputs = self.model.tokenizer(prompt, padding='max_length', max_length=self.tokenizer.model_max_length,
                                 return_tensors='pt')
-        embeddings = self.text_encoder(inputs.input_ids.to(self.device))[0]
+        embeddings = self.model.text_encoder(inputs.input_ids.to(self.device))[0]
 
         return embeddings
 
