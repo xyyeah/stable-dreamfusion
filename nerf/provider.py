@@ -327,8 +327,8 @@ class NeRFPoseDataset:
              -(2 * self.far * self.near) / (self.far - self.near)],
             [0, 0, -1, 0]
         ], dtype=torch.float32, device=self.device).unsqueeze(0)
-        print(projection)
-        exit(0)
+        # print(projection)
+        # exit(0)
 
         mvp = projection @ torch.inverse(poses)  # [1, 4, 4]
 
