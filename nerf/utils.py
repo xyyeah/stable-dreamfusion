@@ -409,7 +409,7 @@ class Trainer(object):
 
                 # rgb_256 = torch.from_numpy(rgbs_256).contiguous().to(self.device)
 
-                rgbs_256 = [get_pil_image2(image) / 255.0 for image in self.opt.images]
+                rgbs_256 = np.stack([get_pil_image2(image) / 255.0 for image in self.opt.images])
                 rgb_256 = torch.from_numpy(rgbs_256).float().contiguous().to(self.device)
                 guidance_embeds = self.guidance["dreamscene"].get_img_embeds(2.0 * rgb_256 - 1.0)
                 if "default" in self.embeddings["dreamscene"]:
