@@ -68,7 +68,10 @@ class ControlledUnetModel(UNetModel):
             if y.shape[0] != x.shape[0]:
                 # label_emb = torch.cat([label_emb, label_emb], dim=0)
                 label_emb = label_emb.repeat(x.shape[0] // y.shape[0], 1)
-            emb = emb + label_emb + control[1]
+            if control is not None:
+                emb = emb + label_emb + control[1]
+            else:
+                emb = emb + label_emb
 
         # print(x.size(), emb.size(), control.size(), context.size())
         # exit(0)
@@ -76,7 +79,10 @@ class ControlledUnetModel(UNetModel):
         h = x.type(self.dtype)
         for module in self.input_blocks:
             if guided:
-                h = module(h, emb, context) + 1.0 * control[0]
+                if control is not None:
+                    h = module(h, emb, context) + 1.0 * control[0]
+                else:
+                    h = module(h, emb, context)
                 guided = False
             else:
                 h = module(h, emb, context)
@@ -108,6 +114,7 @@ class ControlLDM(LatentDiffusion):
         self._init_noise_aug(noise_aug_config)
 
     def _init_embedder(self, config, freeze=True):
+        print('Init embedder....')
         embedder = instantiate_from_config(config)
         if freeze:
             self.embedder = embedder.eval()

@@ -204,22 +204,26 @@ class DreamScene(nn.Module):
                 cond = {"c_crossattn": [c_crossattn], "c_concat": [c_concat], "c_adm": c_adm, "pose": pose,
                         "intrinsic": intrinsic, "dist": dist.view(1)}
                 uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)],
-                          "c_concat": [c_concat], 'c_adm': torch.zeros_like(c_adm),
+                          "c_concat": None, 'c_adm': torch.zeros_like(c_adm),
                           "pose": pose, "intrinsic": intrinsic, "dist": dist.view(1)}
-                c_in = dict()
-                for k in cond:
-                    if isinstance(cond[k], list):
-                        c_in[k] = [torch.cat([uncond[k][i], cond[k][i]]) for i in range(len(cond[k]))]
-                    elif isinstance(cond[k], torch.Tensor):
-                        c_in[k] = torch.cat([uncond[k], cond[k]])
-                    else:
-                        c_in[k] = cond[k]
+                # c_in = dict()
+                # for k in cond:
+                #     if isinstance(cond[k], list):
+                #         c_in[k] = [torch.cat([uncond[k][i], cond[k][i]]) for i in range(len(cond[k]))]
+                #     elif isinstance(cond[k], torch.Tensor):
+                #         c_in[k] = torch.cat([uncond[k], cond[k]])
+                #     else:
+                #         c_in[k] = cond[k]
 
-            # import pdb; pdb.set_trace()
-            model_output_sd, render_rgb = self.model.apply_model(x_in, t_in, c_in, return_rgb=True)
-            model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
-            render_rgb = render_rgb.chunk(2)[1]
-            model_output_sd = model_uncond_sd + 3.0 * (model_t_sd - model_uncond_sd)
+            # # import pdb; pdb.set_trace()
+            # model_output_sd, render_rgb = self.model.apply_model(x_in, t_in, c_in, return_rgb=True)
+            # model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
+            # render_rgb = render_rgb.chunk(2)[1]
+                # import pdb; pdb.set_trace()
+            model_t_sd, render_rgb = self.model.apply_model(x_in, t_in, cond, return_rgb=True)
+            model_uncond_sd, _ = self.model.apply_model(x_in, t_in, uncond, return_rgb=True)
+            # render_rgb = render_rgb.chunk(2)[1]
+            model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
             e_t_sd = self.model.predict_eps_from_z_and_v(latents_noisy_768, t, model_output_sd)
             # e_t_sd2 = self.model.predict_noise_from_start(latents_noisy_768, t, render_rgb)
 
