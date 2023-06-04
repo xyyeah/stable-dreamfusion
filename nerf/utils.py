@@ -382,7 +382,35 @@ class Trainer(object):
                     [cv2.resize(rgba, (256, 256), interpolation=cv2.INTER_AREA).astype(np.float32) / 255 for rgba in
                      rgbas])
                 rgbs_256 = rgba_256[..., :3] * rgba_256[..., 3:] + (1 - rgba_256[..., 3:])
-                rgb_256 = torch.from_numpy(rgbs_256).contiguous().to(self.device)
+
+                def get_pil_image2(image_filename, scale_factor=1.0):
+                    """Returns the image of shape (H, W, 3 or 4).
+
+                    Args:
+                        image_idx: The image index in the dataset.
+                    """
+                    import PIL
+                    image = PIL.Image.open(image_filename)
+
+                    image = np.array(image)
+                    mask = image[:, :, 3]
+                    image[mask == 0] = 255
+                    image = PIL.Image.fromarray(image[:, :, :3])
+
+                    image = image.resize((256, 256), resample=PIL.Image.ANTIALIAS)
+                    image = np.array(image)
+                    pil_image = PIL.Image.fromarray(image[:, :, :3])
+                    if scale_factor != 1.0:
+                        width, height = pil_image.size
+                        newsize = (int(width * scale_factor), int(height * scale_factor))
+                        pil_image = pil_image.resize(newsize, resample=PIL.Image.ANTIALIAS)
+
+                    return np.asarray(pil_image)
+
+                # rgb_256 = torch.from_numpy(rgbs_256).contiguous().to(self.device)
+
+                rgbs_256 = [get_pil_image2(image) / 255.0 for image in self.opt.images]
+                rgb_256 = torch.from_numpy(rgbs_256).float().contiguous().to(self.device)
                 guidance_embeds = self.guidance["dreamscene"].get_img_embeds(2.0 * rgb_256 - 1.0)
                 if "default" in self.embeddings["dreamscene"]:
                     print('fuck', self.opt.text, self.opt.negative)
