@@ -230,7 +230,7 @@ class DreamScene(nn.Module):
         noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
         w = (1 - self.alphas[t])
-        grad = (grad_scale * w)[:, None, None, None] * noise_pred_sd
+        grad = (grad_scale * w)[:, None, None, None] * (noise_pred_sd - noise_768)
         grad = torch.nan_to_num(grad)
 
         if save_guidance_path:
@@ -251,7 +251,7 @@ class DreamScene(nn.Module):
             save_image(viz_images, save_guidance_path)
 
         loss = SpecifyGradient.apply(latents_768, grad)
-        return loss_sd - loss
+        return loss_sd + loss
 
     # def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
     #                guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
