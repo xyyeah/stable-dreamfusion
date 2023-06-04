@@ -15,6 +15,7 @@
          --seed 1
          # --default_radius 2.0 --radius_range 1.6 2.4
 
+
    python3.9 main.py -O --image ./data/teddy_rgba.png  --dreamscene\
    --text "a brown teddy bear sitting on a ground" --negative "low quality" \
    --workspace /workspace/teddy_vsd --test_interval 2 --save_guidance --save_guidance_interval 50 --ckpt scratch \
