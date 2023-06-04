@@ -163,6 +163,7 @@ class DreamScene(nn.Module):
             torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0),
             pred_rgb,
             guidance_scale,
+            grad_scale=0.1
         )
         # return loss1, t
         # text_embeddings = torch.cat([embeddings['neg_prompt_embeds'], embeddings['prompt_embeds']], dim=0)
@@ -251,7 +252,7 @@ class DreamScene(nn.Module):
             save_image(viz_images, save_guidance_path)
 
         loss = SpecifyGradient.apply(latents_768, grad)
-        return loss
+        return loss_sd + loss
 
     # def train_step(self, embeddings, pred_rgb, pose, intrinsic, dist,
     #                guidance_scale=3, as_latent=False, grad_scale=1, save_guidance_path: Path = None):
