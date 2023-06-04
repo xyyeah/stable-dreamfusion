@@ -21,6 +21,12 @@
    --workspace /workspace/teddy_vsd --test_interval 2 --save_guidance --save_guidance_interval 50 --ckpt scratch \
    --lambda_3d_normal_smooth 0.0 --lambda_2d_normal_smooth 0.0 --lambda_depth 0.0 --lambda_rgb 0.0  --lambda_mask 0.0
 
+
+   python3.9 main.py -O --image ./data/teddy_rgba.png  --dreamscene\
+   --text "a brown teddy bear sitting on a ground" --negative "low quality" \
+   --workspace ./teddy_vsd --test_interval 2 --save_guidance --save_guidance_interval 50 --ckpt scratch \
+   --lambda_3d_normal_smooth 0.0 --lambda_2d_normal_smooth 0.0 --lambda_depth 0.0 --lambda_rgb 0.0  --lambda_mask 0.0
+
   python3.9 main.py -O --image ./data/teddy_rgba.png  --dreamscene\
    --text "a brown teddy bear sitting on a ground" --negative "low quality" \
    --workspace /workspace/teddy_vsd --test_interval 2 --save_guidance --save_guidance_interval 50 --ckpt scratch \

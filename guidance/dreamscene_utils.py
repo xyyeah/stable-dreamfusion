@@ -219,7 +219,7 @@ class DreamScene(nn.Module):
             model_output_sd, render_rgb = self.model.apply_model(x_in, t_in, c_in, return_rgb=True)
             model_uncond_sd, model_t_sd = model_output_sd.chunk(2)
             render_rgb = render_rgb.chunk(2)[1]
-            model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
+            model_output_sd = model_uncond_sd + 3.0 * (model_t_sd - model_uncond_sd)
             e_t_sd = self.model.predict_eps_from_z_and_v(latents_noisy_768, t, model_output_sd)
             # e_t_sd2 = self.model.predict_noise_from_start(latents_noisy_768, t, render_rgb)
 
