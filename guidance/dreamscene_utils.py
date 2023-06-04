@@ -222,9 +222,8 @@ class DreamScene(nn.Module):
             model_output_sd = model_uncond_sd + guidance_scale * (model_t_sd - model_uncond_sd)
             e_t_sd = self.model.predict_eps_from_z_and_v(latents_noisy_768, t, model_output_sd)
             e_t_sd2 = self.model.predict_noise_from_start(latents_noisy_768, t, render_rgb)
-            e_t_sd = e_t_sd2
 
-            noise_preds_sd.append(e_t_sd)
+            noise_preds_sd.append(e_t_sd2)
         noise_pred_sd = torch.stack(noise_preds_sd).sum(dim=0) / len(noise_preds_sd)
 
         w = (1 - self.alphas[t])
