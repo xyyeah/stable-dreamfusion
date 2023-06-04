@@ -204,7 +204,7 @@ class DreamScene(nn.Module):
                 cond = {"c_crossattn": [c_crossattn], "c_concat": [c_concat], "c_adm": c_adm, "pose": pose,
                         "intrinsic": intrinsic, "dist": dist.view(1)}
                 uncond = {"c_crossattn": [self.model.get_unconditional_conditioning(1)],
-                          "c_concat": torch.zeros_like(c_concat), 'c_adm': torch.zeros_like(c_adm),
+                          "c_concat": [torch.zeros_like(c_concat)], 'c_adm': torch.zeros_like(c_adm),
                           "pose": pose, "intrinsic": intrinsic, "dist": dist.view(1)}
                 c_in = dict()
                 for k in cond:
