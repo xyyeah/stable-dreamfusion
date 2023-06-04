@@ -559,7 +559,8 @@ class Trainer(object):
             if self.opt.bg_radius > 0 and rand > 0.5:
                 bg_color = None  # use bg_net
             else:
-                bg_color = torch.rand(3).to(self.device)  # single color random bg
+                bg_color = 1
+                # bg_color = torch.rand(3).to(self.device)  # single color random bg
 
         outputs = self.model.render(rays_o, rays_d, mvp, H, W, staged=False, perturb=True, bg_color=bg_color,
                                     ambient_ratio=ambient_ratio, shading=shading, binarize=binarize)
